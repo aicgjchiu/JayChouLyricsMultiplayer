@@ -18,6 +18,22 @@ function broadcastLobbyList() {
 // Serve audio files
 app.use('/audio', express.static(join(__dirname, '../../audio')));
 
+// Serve recordings (in-memory audio buffers)
+app.get('/recordings/:lobbyId/:songIdx/:phaseIdx', (req, res) => {
+  const { lobbyId, songIdx, phaseIdx } = req.params;
+  const lobby = manager.lobbies.get(lobbyId);
+  if (!lobby || !lobby.telephone) {
+    return res.status(404).send('Not found');
+  }
+  const key = `${songIdx}-${phaseIdx}`;
+  const buffer = lobby.telephone.recordings.get(key);
+  if (!buffer) {
+    return res.status(404).send('Recording not found');
+  }
+  res.set('Content-Type', 'audio/webm');
+  res.send(buffer);
+});
+
 // Serve React production build
 app.use(express.static(join(__dirname, '../../client/dist')));
 app.get('*', (_req, res) => {
@@ -54,6 +70,12 @@ io.on('connection', (socket) => {
   socket.on('submit-answer', (data) => manager.submitAnswer(socket.id, data, io));
   socket.on('update-draft', ({ answer }) => manager.updateDraft(socket.id, answer));
   socket.on('next-question', () => manager.nextQuestion(socket.id, io));
+  socket.on('submit-recording', ({ audioData }) => {
+    const buffer = Buffer.from(audioData);
+    manager.submitRecording(socket.id, buffer, io);
+  });
+  socket.on('submit-guess', ({ guess }) => manager.submitGuess(socket.id, guess, io));
+  socket.on('next-song', () => manager.nextSong(socket.id, io));
 
   socket.on('restart-lobby', () => {
     manager.restartLobby(socket.id, io);
