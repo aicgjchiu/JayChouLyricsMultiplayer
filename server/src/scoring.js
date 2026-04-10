@@ -6,6 +6,16 @@ const toTraditional = OpenCC.Converter({ from: 'cn', to: 'tw' });
 // e.g. both 刮 (traditional) and 颳 (opencc tw variant) map to the same simplified form
 const toSimplified = OpenCC.Converter({ from: 't', to: 'cn' });
 
+/**
+ * Converts Simplified Chinese to Traditional Chinese (Taiwan form) and strips
+ * punctuation/spaces. Returns traditional Chinese text.
+ *
+ * NOTE: Do NOT use this for scoring comparison — it returns Taiwan traditional
+ * form which may include variants (e.g. 颳 instead of 刮) that won't match the
+ * correct answer. Use calculateScore() which handles comparison internally.
+ *
+ * Safe to use for: char count display, hints, UI labels.
+ */
 export function normalizeText(str) {
   return toTraditional(str).replace(/[\s\p{P}]/gu, '');
 }

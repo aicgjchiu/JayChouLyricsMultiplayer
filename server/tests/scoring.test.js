@@ -54,4 +54,10 @@ describe('calculateScore', () => {
     const result = calculateScore('海風刮過了無人的街道', correct, 5000, 30000);
     expect(result.accuracy).toBeCloseTo(1.0);
   });
+
+  it('treats OpenCC tw variant 颳 as equivalent to traditional 刮', () => {
+    // OpenCC cn→tw converts 刮 to 颳; normalizeForComparison unifies them so scoring is correct
+    const result = calculateScore('颳', '刮', null, 30000);
+    expect(result.accuracyScore).toBe(100);
+  });
 });
