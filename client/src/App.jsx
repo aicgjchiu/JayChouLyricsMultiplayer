@@ -6,6 +6,9 @@ import Lobby from './pages/Lobby.jsx';
 import Game from './pages/Game.jsx';
 import Reveal from './pages/Reveal.jsx';
 import Results from './pages/Results.jsx';
+import TelephonePhase from './pages/TelephonePhase.jsx';
+import TelephoneGuess from './pages/TelephoneGuess.jsx';
+import TelephoneResults from './pages/TelephoneResults.jsx';
 
 export default function App() {
   const [page, setPage] = useState('menu');
@@ -15,11 +18,16 @@ export default function App() {
   const [timer, setTimer] = useState(0);
   const [revealData, setRevealData] = useState(null);
   const [finalData, setFinalData] = useState(null);
+  // Telephone mode state
+  const [phonePhase, setPhonePhase] = useState(null);
+  const [phoneGuess, setPhoneGuess] = useState(null);
+  const [phoneResults, setPhoneResults] = useState(null);
 
   useSocketEvent('lobby-updated', useCallback((data) => setLobby(data), []));
 
   useSocketEvent('joined-lobby', useCallback(() => setPage('lobby'), []));
 
+  // Lyrics-guess events
   useSocketEvent('question-start', useCallback((data) => {
     setQuestion(data);
     setTimer(data.timeLimit);
@@ -36,9 +44,43 @@ export default function App() {
     setPage('reveal');
   }, []));
 
+  // Telephone events
+  useSocketEvent('telephone-phase-start', useCallback((data) => {
+    setPhonePhase(data);
+    setTimer(data.phaseDuration);
+    setPage('telephone-phase');
+  }, []));
+
+  useSocketEvent('telephone-timer-tick', useCallback(({ secondsRemaining }) => {
+    setTimer(secondsRemaining);
+  }, []));
+
+  useSocketEvent('telephone-phase-end', useCallback(() => {
+    // Brief transition — next phase-start will arrive shortly
+  }, []));
+
+  useSocketEvent('telephone-guess-start', useCallback((data) => {
+    setPhoneGuess(data);
+    setTimer(data.phaseDuration);
+    setPage('telephone-guess');
+  }, []));
+
+  useSocketEvent('telephone-results-start', useCallback((data) => {
+    setPhoneResults(data);
+    setPage('telephone-results');
+  }, []));
+
+  useSocketEvent('telephone-next-song', useCallback(({ songIndex }) => {
+    setPhoneResults(prev => prev ? { ...prev, currentSongIndex: songIndex } : prev);
+  }, []));
+
   useSocketEvent('game-over', useCallback((data) => {
     setFinalData(data);
-    setPage('results');
+    if (data.mode === 'telephone') {
+      setPage('telephone-results');
+    } else {
+      setPage('results');
+    }
   }, []));
 
   useSocketEvent('kicked-to-menu', useCallback(() => {
@@ -47,6 +89,9 @@ export default function App() {
     setQuestion(null);
     setRevealData(null);
     setFinalData(null);
+    setPhonePhase(null);
+    setPhoneGuess(null);
+    setPhoneResults(null);
   }, []));
 
   const goToMenu = useCallback(() => {
@@ -56,6 +101,9 @@ export default function App() {
     setQuestion(null);
     setRevealData(null);
     setFinalData(null);
+    setPhonePhase(null);
+    setPhoneGuess(null);
+    setPhoneResults(null);
   }, []);
 
   const goToLobby = useCallback((isHost) => {
@@ -64,6 +112,9 @@ export default function App() {
     setQuestion(null);
     setRevealData(null);
     setFinalData(null);
+    setPhonePhase(null);
+    setPhoneGuess(null);
+    setPhoneResults(null);
   }, []);
 
   const sharedProps = {
@@ -81,6 +132,11 @@ export default function App() {
       {page === 'game' && <Game {...sharedProps} />}
       {page === 'reveal' && <Reveal {...sharedProps} />}
       {page === 'results' && <Results {...sharedProps} />}
+      {page === 'telephone-phase' && <TelephonePhase phase={phonePhase} timer={timer} lobby={lobby} nickname={nickname} />}
+      {page === 'telephone-guess' && <TelephoneGuess guess={phoneGuess} timer={timer} lobby={lobby} nickname={nickname} />}
+      {page === 'telephone-results' && (
+        <TelephoneResults results={phoneResults} lobby={lobby} finalData={finalData} goToMenu={goToMenu} goToLobby={goToLobby} />
+      )}
     </>
   );
 }
