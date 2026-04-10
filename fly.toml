@@ -3,6 +3,8 @@ primary_region = "nrt"
 
 [build]
 
+# NOTE: This app uses in-memory state — keep machine count at 1.
+# To enforce: fly scale count 1 --app jay-chou-lyrics-game --yes
 [http_service]
   internal_port = 3000
   force_https = true
