@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import socket from './socket.js';
 import { useSocketEvent } from './hooks/useSocket.js';
 import MainMenu from './pages/MainMenu.jsx';
@@ -22,6 +22,11 @@ export default function App() {
   const [phonePhase, setPhonePhase] = useState(null);
   const [phoneGuess, setPhoneGuess] = useState(null);
   const [phoneResults, setPhoneResults] = useState(null);
+  // Rematch state
+  const [rematchPlayers, setRematchPlayers] = useState([]);
+  const [hostWantsRematch, setHostWantsRematch] = useState(false);
+  const [votedRematch, setVotedRematch] = useState(false);
+  const votedRematchRef = useRef(false);
 
   useSocketEvent('lobby-updated', useCallback((data) => setLobby(data), []));
 
@@ -76,6 +81,10 @@ export default function App() {
 
   useSocketEvent('game-over', useCallback((data) => {
     setFinalData(data);
+    setRematchPlayers([]);
+    setHostWantsRematch(false);
+    setVotedRematch(false);
+    votedRematchRef.current = false;
     if (data.mode === 'telephone') {
       setPage('telephone-results');
     } else {
@@ -83,14 +92,28 @@ export default function App() {
     }
   }, []));
 
+  useSocketEvent('player-wants-rematch', useCallback(({ nickname: n }) => {
+    setRematchPlayers(prev => prev.includes(n) ? prev : [...prev, n]);
+  }, []));
+
   useSocketEvent('lobby-restarted', useCallback(() => {
-    setPage('lobby');
-    setQuestion(null);
-    setRevealData(null);
-    setFinalData(null);
-    setPhonePhase(null);
-    setPhoneGuess(null);
-    setPhoneResults(null);
+    if (votedRematchRef.current) {
+      // Player pre-voted rematch → auto-join lobby
+      setPage('lobby');
+      setQuestion(null);
+      setRevealData(null);
+      setFinalData(null);
+      setPhonePhase(null);
+      setPhoneGuess(null);
+      setPhoneResults(null);
+      setRematchPlayers([]);
+      setHostWantsRematch(false);
+      setVotedRematch(false);
+      votedRematchRef.current = false;
+    } else {
+      // Show choice to non-host (host already navigated via goToLobby)
+      setHostWantsRematch(true);
+    }
   }, []));
 
   useSocketEvent('kicked-to-menu', useCallback(() => {
@@ -102,6 +125,10 @@ export default function App() {
     setPhonePhase(null);
     setPhoneGuess(null);
     setPhoneResults(null);
+    setRematchPlayers([]);
+    setHostWantsRematch(false);
+    setVotedRematch(false);
+    votedRematchRef.current = false;
   }, []));
 
   const goToMenu = useCallback(() => {
@@ -114,6 +141,10 @@ export default function App() {
     setPhonePhase(null);
     setPhoneGuess(null);
     setPhoneResults(null);
+    setRematchPlayers([]);
+    setHostWantsRematch(false);
+    setVotedRematch(false);
+    votedRematchRef.current = false;
   }, []);
 
   const goToLobby = useCallback((isHost) => {
@@ -125,6 +156,30 @@ export default function App() {
     setPhonePhase(null);
     setPhoneGuess(null);
     setPhoneResults(null);
+    setRematchPlayers([]);
+    setHostWantsRematch(false);
+    setVotedRematch(false);
+    votedRematchRef.current = false;
+  }, []);
+
+  const handleWantRematch = useCallback(() => {
+    socket.emit('want-rematch');
+    setVotedRematch(true);
+    votedRematchRef.current = true;
+  }, []);
+
+  const handleJoinRematch = useCallback(() => {
+    setPage('lobby');
+    setQuestion(null);
+    setRevealData(null);
+    setFinalData(null);
+    setPhonePhase(null);
+    setPhoneGuess(null);
+    setPhoneResults(null);
+    setRematchPlayers([]);
+    setHostWantsRematch(false);
+    setVotedRematch(false);
+    votedRematchRef.current = false;
   }, []);
 
   const sharedProps = {
@@ -133,6 +188,8 @@ export default function App() {
     question, timer,
     revealData, finalData,
     setPage, goToMenu, goToLobby,
+    rematchPlayers, hostWantsRematch, votedRematch,
+    onWantRematch: handleWantRematch, onJoinRematch: handleJoinRematch,
   };
 
   return (
@@ -145,7 +202,12 @@ export default function App() {
       {page === 'telephone-phase' && <TelephonePhase phase={phonePhase} timer={timer} lobby={lobby} nickname={nickname} />}
       {page === 'telephone-guess' && <TelephoneGuess guess={phoneGuess} timer={timer} lobby={lobby} nickname={nickname} />}
       {page === 'telephone-results' && (
-        <TelephoneResults results={phoneResults} lobby={lobby} finalData={finalData} goToMenu={goToMenu} goToLobby={goToLobby} />
+        <TelephoneResults
+          results={phoneResults} lobby={lobby} finalData={finalData}
+          goToMenu={goToMenu} goToLobby={goToLobby}
+          rematchPlayers={rematchPlayers} hostWantsRematch={hostWantsRematch}
+          votedRematch={votedRematch} onWantRematch={handleWantRematch} onJoinRematch={handleJoinRematch}
+        />
       )}
     </>
   );

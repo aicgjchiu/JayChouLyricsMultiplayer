@@ -76,6 +76,7 @@ io.on('connection', (socket) => {
   });
   socket.on('submit-guess', ({ guess }) => manager.submitGuess(socket.id, guess, io));
   socket.on('next-song', () => manager.nextSong(socket.id, io));
+  socket.on('want-rematch', () => manager.wantRematch(socket.id, io));
 
   socket.on('restart-lobby', () => {
     manager.restartLobby(socket.id, io);

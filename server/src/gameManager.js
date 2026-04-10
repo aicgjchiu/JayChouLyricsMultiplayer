@@ -236,6 +236,15 @@ export class GameManager {
     telephoneMode.nextSong(lobby, socketId, io);
   }
 
+  wantRematch(socketId, io) {
+    const lobby = this.getLobby(socketId);
+    if (!lobby || lobby.state !== 'finished') return;
+    if (lobby.hostSocketId === socketId) return;
+    const player = lobby.players.find(p => p.socketId === socketId);
+    if (!player) return;
+    io.to(lobby.id).emit('player-wants-rematch', { nickname: player.nickname });
+  }
+
   _closeLobby(lobby, io, reason) {
     if (lobby.timerHandle) { clearInterval(lobby.timerHandle); lobby.timerHandle = null; }
     if (lobby.revealTimer) { clearTimeout(lobby.revealTimer); lobby.revealTimer = null; }
