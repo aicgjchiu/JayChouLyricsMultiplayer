@@ -7,6 +7,7 @@ export default function MainMenu({ nickname, setNickname }) {
   const [lobbyList, setLobbyList] = useState([]);
   const [form, setForm] = useState({
     lobbyName: '', numQuestions: 10, timeLimit: 30, isPrivate: false, password: '',
+    gameMode: 'lyrics-guess', phaseDuration: 90,
   });
   const [joiningPrivate, setJoiningPrivate] = useState(null); // lobby object | null
   const [privatePassword, setPrivatePassword] = useState('');
@@ -37,6 +38,8 @@ export default function MainMenu({ nickname, setNickname }) {
       timeLimit: form.timeLimit,
       isPrivate: form.isPrivate,
       password: form.isPrivate ? form.password : null,
+      gameMode: form.gameMode,
+      phaseDuration: form.phaseDuration,
     });
   }
 
@@ -128,17 +131,38 @@ export default function MainMenu({ nickname, setNickname }) {
           <input value={form.lobbyName} onChange={e => setForm(f => ({ ...f, lobbyName: e.target.value }))}
             placeholder={`${nickname || '你'}'s Lobby`} style={{ width: '100%', padding: '6px 10px', margin: '4px 0 12px', boxSizing: 'border-box' }} />
 
-          <label>題數</label>
-          <select value={form.numQuestions} onChange={e => setForm(f => ({ ...f, numQuestions: Number(e.target.value) }))}
+          <label>遊戲模式</label>
+          <select value={form.gameMode} onChange={e => setForm(f => ({ ...f, gameMode: e.target.value }))}
             style={{ width: '100%', padding: '6px 10px', margin: '4px 0 12px' }}>
-            {[5, 10, 15, 20].map(n => <option key={n} value={n}>{n} 題</option>)}
+            <option value="lyrics-guess">周杰倫猜歌</option>
+            <option value="telephone">音樂傳聲筒</option>
           </select>
 
-          <label>每題時間</label>
-          <select value={form.timeLimit} onChange={e => setForm(f => ({ ...f, timeLimit: Number(e.target.value) }))}
-            style={{ width: '100%', padding: '6px 10px', margin: '4px 0 12px' }}>
-            {[15, 30, 45].map(s => <option key={s} value={s}>{s} 秒</option>)}
-          </select>
+          {form.gameMode === 'lyrics-guess' && (
+            <>
+              <label>題數</label>
+              <select value={form.numQuestions} onChange={e => setForm(f => ({ ...f, numQuestions: Number(e.target.value) }))}
+                style={{ width: '100%', padding: '6px 10px', margin: '4px 0 12px' }}>
+                {[5, 10, 15, 20].map(n => <option key={n} value={n}>{n} 題</option>)}
+              </select>
+
+              <label>每題時間</label>
+              <select value={form.timeLimit} onChange={e => setForm(f => ({ ...f, timeLimit: Number(e.target.value) }))}
+                style={{ width: '100%', padding: '6px 10px', margin: '4px 0 12px' }}>
+                {[15, 30, 45].map(s => <option key={s} value={s}>{s} 秒</option>)}
+              </select>
+            </>
+          )}
+
+          {form.gameMode === 'telephone' && (
+            <>
+              <label>每回合時間</label>
+              <select value={form.phaseDuration} onChange={e => setForm(f => ({ ...f, phaseDuration: Number(e.target.value) }))}
+                style={{ width: '100%', padding: '6px 10px', margin: '4px 0 12px' }}>
+                {[60, 90, 120].map(s => <option key={s} value={s}>{s} 秒</option>)}
+              </select>
+            </>
+          )}
 
           <label>
             <input type="checkbox" checked={form.isPrivate} onChange={e => setForm(f => ({ ...f, isPrivate: e.target.checked }))} />
