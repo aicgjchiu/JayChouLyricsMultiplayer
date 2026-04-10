@@ -191,6 +191,12 @@ export class GameManager {
     lobby.playerDrafts.set(socketId, answer);
   }
 
+  nextQuestion(socketId, io) {
+    const lobby = this.getLobby(socketId);
+    if (!lobby || lobby.hostSocketId !== socketId || lobby.state !== 'reveal') return;
+    this._nextQuestion(lobby, io);
+  }
+
   _startQuestion(lobby, io) {
     lobby.state = 'in_question';
     lobby.currentAnswers = new Map();
@@ -251,11 +257,6 @@ export class GameManager {
     });
 
     io.to(lobby.id).emit('question-end', { correctAnswer: q.answer, results });
-
-    lobby.revealTimer = setTimeout(() => {
-      lobby.revealTimer = null;
-      this._nextQuestion(lobby, io);
-    }, 5000);
   }
 
   _nextQuestion(lobby, io) {

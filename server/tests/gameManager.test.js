@@ -364,3 +364,102 @@ describe('GameManager._endQuestion draft fallback', () => {
     if (lobby.revealTimer) clearTimeout(lobby.revealTimer);
   });
 });
+
+describe('GameManager.nextQuestion', () => {
+  it('does not set revealTimer after _endQuestion (no auto-advance)', () => {
+    const mgr = new GameManager();
+    const lobby = mgr.createLobby('host', {
+      nickname: 'Host', lobbyName: 'Room', numQuestions: 5, timeLimit: 30,
+      isPrivate: false, password: null,
+    });
+    mgr.joinLobby('p2', { lobbyCode: lobby.id, nickname: 'Player2', password: null });
+    const io = makeMockIo();
+    mgr.startGame('host', io);
+
+    if (lobby.timerHandle) { clearInterval(lobby.timerHandle); lobby.timerHandle = null; }
+    mgr._endQuestion(lobby, io);
+
+    expect(lobby.revealTimer).toBeNull();
+
+    if (lobby.revealTimer) clearTimeout(lobby.revealTimer);
+  });
+
+  it('rejects if caller is not the host', () => {
+    const mgr = new GameManager();
+    const lobby = mgr.createLobby('host', {
+      nickname: 'Host', lobbyName: 'Room', numQuestions: 5, timeLimit: 30,
+      isPrivate: false, password: null,
+    });
+    mgr.joinLobby('p2', { lobbyCode: lobby.id, nickname: 'Player2', password: null });
+    const io = makeMockIo();
+    mgr.startGame('host', io);
+    lobby.state = 'reveal';
+
+    mgr.nextQuestion('p2', io);
+    expect(lobby.state).toBe('reveal'); // unchanged
+
+    if (lobby.timerHandle) clearInterval(lobby.timerHandle);
+  });
+
+  it('rejects if state is not reveal', () => {
+    const mgr = new GameManager();
+    const lobby = mgr.createLobby('host', {
+      nickname: 'Host', lobbyName: 'Room', numQuestions: 5, timeLimit: 30,
+      isPrivate: false, password: null,
+    });
+    mgr.joinLobby('p2', { lobbyCode: lobby.id, nickname: 'Player2', password: null });
+    const io = makeMockIo();
+    mgr.startGame('host', io);
+    // state is in_question
+
+    mgr.nextQuestion('host', io);
+    expect(lobby.state).toBe('in_question'); // unchanged
+
+    if (lobby.timerHandle) clearInterval(lobby.timerHandle);
+  });
+
+  it('advances to next question when host calls from reveal state', () => {
+    const mgr = new GameManager();
+    const lobby = mgr.createLobby('host', {
+      nickname: 'Host', lobbyName: 'Room', numQuestions: 5, timeLimit: 30,
+      isPrivate: false, password: null,
+    });
+    mgr.joinLobby('p2', { lobbyCode: lobby.id, nickname: 'Player2', password: null });
+    const io = makeMockIo();
+    mgr.startGame('host', io);
+    lobby.state = 'reveal';
+    io._emitFn.mockClear();
+    io.to.mockClear();
+
+    mgr.nextQuestion('host', io);
+
+    expect(lobby.state).toBe('in_question');
+    expect(io._emitFn).toHaveBeenCalledWith('question-start', expect.objectContaining({
+      questionIndex: 2,
+    }));
+
+    if (lobby.timerHandle) clearInterval(lobby.timerHandle);
+  });
+
+  it('ends the game when host advances past the last question', () => {
+    const mgr = new GameManager();
+    const lobby = mgr.createLobby('host', {
+      nickname: 'Host', lobbyName: 'Room', numQuestions: 5, timeLimit: 30,
+      isPrivate: false, password: null,
+    });
+    mgr.joinLobby('p2', { lobbyCode: lobby.id, nickname: 'Player2', password: null });
+    const io = makeMockIo();
+    mgr.startGame('host', io);
+    lobby.currentQuestionIndex = 4; // 0-indexed; this is the last of 5
+    lobby.state = 'reveal';
+    io._emitFn.mockClear();
+    io.to.mockClear();
+
+    mgr.nextQuestion('host', io);
+
+    expect(lobby.state).toBe('finished');
+    expect(io._emitFn).toHaveBeenCalledWith('game-over', expect.objectContaining({
+      finalScores: expect.any(Array),
+    }));
+  });
+});
