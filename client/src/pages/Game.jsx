@@ -24,6 +24,14 @@ export default function Game({ question, timer, lobby, nickname }) {
     setSubmittedPlayers(prev => [...prev, submitterNickname]);
   }, []));
 
+  function handleAnswerChange(e) {
+    const newAnswer = e.target.value;
+    setAnswer(newAnswer);
+    if (!submitted) {
+      socket.emit('update-draft', { answer: newAnswer });
+    }
+  }
+
   function handleSubmit(e) {
     e.preventDefault();
     if (submitted) return;
@@ -56,7 +64,7 @@ export default function Game({ question, timer, lobby, nickname }) {
       <form onSubmit={handleSubmit}>
         <textarea
           value={answer}
-          onChange={e => setAnswer(e.target.value)}
+          onChange={handleAnswerChange}
           disabled={submitted}
           placeholder={submitted ? '已提交' : '輸入歌詞...'}
           rows={2}
