@@ -1,12 +1,8 @@
-import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
-import { calculateScore, normalizeText } from './scoring.js';
+import { dirname } from 'path';
+import * as lyricsGuessMode from './modes/lyricsGuess.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const allQuestions = JSON.parse(
-  readFileSync(join(__dirname, '../../questions.json'), 'utf-8')
-);
 
 function generateCode() {
   return Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -14,8 +10,8 @@ function generateCode() {
 
 export class GameManager {
   constructor() {
-    this.lobbies = new Map();       // code -> lobby
-    this.socketToLobby = new Map(); // socketId -> code
+    this.lobbies = new Map();
+    this.socketToLobby = new Map();
   }
 
   getLobby(socketId) {
@@ -42,11 +38,15 @@ export class GameManager {
       hostSocketId: lobby.hostSocketId,
       settings: lobby.settings,
       maxPlayers: lobby.maxPlayers,
-      players: lobby.players.map(p => ({ nickname: p.nickname, score: p.score, isHost: p.socketId === lobby.hostSocketId })),
+      players: lobby.players.map(p => ({
+        nickname: p.nickname,
+        score: p.score,
+        isHost: p.socketId === lobby.hostSocketId,
+      })),
     };
   }
 
-  createLobby(socketId, { nickname, lobbyName, numQuestions, timeLimit, isPrivate, password }) {
+  createLobby(socketId, { nickname, lobbyName, numQuestions, timeLimit, isPrivate, password, gameMode, phaseDuration }) {
     let code;
     do { code = generateCode(); } while (this.lobbies.has(code));
 
@@ -57,9 +57,15 @@ export class GameManager {
       isPrivate: Boolean(isPrivate),
       password: password || null,
       maxPlayers: 8,
-      settings: { numQuestions: Math.min(numQuestions || 10, allQuestions.length), timeLimit: timeLimit || 30 },
+      settings: {
+        gameMode: gameMode || 'lyrics-guess',
+        numQuestions: numQuestions || 10,
+        timeLimit: timeLimit || 30,
+        phaseDuration: phaseDuration || 90,
+      },
       players: [{ socketId, nickname, score: 0 }],
       state: 'waiting',
+      // Lyrics-guess fields
       questions: [],
       currentQuestionIndex: 0,
       currentAnswers: new Map(),
@@ -68,6 +74,8 @@ export class GameManager {
       revealTimer: null,
       questionStartTime: null,
       secondsRemaining: 0,
+      // Telephone fields (populated at game start)
+      telephone: null,
     };
 
     this.lobbies.set(code, lobby);
@@ -113,7 +121,7 @@ export class GameManager {
       }
       if (lobby.currentAnswers.size >= lobby.players.length) {
         if (lobby.timerHandle) { clearInterval(lobby.timerHandle); lobby.timerHandle = null; }
-        this._endQuestion(lobby, io);
+        lyricsGuessMode.endQuestion(lobby, io);
       }
     } else if (lobby.state === 'reveal') {
       if (lobby.players.length === 0) {
@@ -124,6 +132,15 @@ export class GameManager {
       io.to(lobby.id).emit('lobby-updated', this.lobbyPayload(lobby));
     } else if (lobby.state === 'finished') {
       io.to(lobby.id).emit('lobby-updated', this.lobbyPayload(lobby));
+    } else if (lobby.state.startsWith('telephone_')) {
+      if (lobby.players.length === 0) {
+        if (lobby.timerHandle) { clearInterval(lobby.timerHandle); lobby.timerHandle = null; }
+        this.lobbies.delete(lobby.id);
+        return;
+      }
+      if (lobby.telephone) {
+        lobby.telephone.submissions.add(socketId);
+      }
     }
   }
 
@@ -133,15 +150,16 @@ export class GameManager {
 
   startGame(socketId, io) {
     const lobby = this.getLobby(socketId);
-    if (!lobby || lobby.hostSocketId !== socketId) return;
-    if (lobby.players.length < 2 || lobby.state !== 'waiting') return;
+    if (!lobby || lobby.hostSocketId !== socketId || lobby.state !== 'waiting') return;
 
-    const shuffled = [...allQuestions].sort(() => Math.random() - 0.5);
-    lobby.questions = shuffled.slice(0, lobby.settings.numQuestions);
-    lobby.currentQuestionIndex = 0;
-    lobby.players.forEach(p => { p.score = 0; });
+    if (lobby.settings.gameMode === 'telephone') {
+      if (lobby.players.length < 3) return;
+      // Telephone mode start is handled in Task 4
+      return;
+    }
 
-    this._startQuestion(lobby, io);
+    if (lobby.players.length < 2) return;
+    lyricsGuessMode.startGame(lobby, io);
   }
 
   restartLobby(socketId, io) {
@@ -155,122 +173,66 @@ export class GameManager {
     lobby.currentAnswers = new Map();
     lobby.playerDrafts = new Map();
     lobby.players.forEach(p => { p.score = 0; });
+    lobby.telephone = null;
 
     io.to(lobby.id).emit('lobby-updated', this.lobbyPayload(lobby));
   }
 
-  updateSettings(socketId, { numQuestions, timeLimit }, io) {
+  updateSettings(socketId, data, io) {
     const lobby = this.getLobby(socketId);
     if (!lobby || lobby.hostSocketId !== socketId || lobby.state !== 'waiting') return;
-    if (numQuestions) lobby.settings.numQuestions = numQuestions;
-    if (timeLimit) lobby.settings.timeLimit = timeLimit;
+    if (data.numQuestions) lobby.settings.numQuestions = data.numQuestions;
+    if (data.timeLimit) lobby.settings.timeLimit = data.timeLimit;
+    if (data.phaseDuration) lobby.settings.phaseDuration = data.phaseDuration;
+    if (data.gameMode) lobby.settings.gameMode = data.gameMode;
     io.to(lobby.id).emit('lobby-updated', this.lobbyPayload(lobby));
   }
 
-  submitAnswer(socketId, { answer }, io) {
+  submitAnswer(socketId, data, io) {
     const lobby = this.getLobby(socketId);
-    if (!lobby || lobby.state !== 'in_question') return;
-    if (lobby.currentAnswers.has(socketId)) return;
-
-    const submittedMs = Date.now() - lobby.questionStartTime;
-    lobby.currentAnswers.set(socketId, { answer, submittedMs });
-
-    const player = lobby.players.find(p => p.socketId === socketId);
-    if (player) io.to(lobby.id).emit('player-submitted', { nickname: player.nickname });
-
-    if (lobby.currentAnswers.size >= lobby.players.length) {
-      if (lobby.timerHandle) { clearInterval(lobby.timerHandle); lobby.timerHandle = null; }
-      this._endQuestion(lobby, io);
-    }
+    if (!lobby) return;
+    lyricsGuessMode.submitAnswer(lobby, socketId, data, io);
   }
 
   updateDraft(socketId, answer) {
     const lobby = this.getLobby(socketId);
-    if (!lobby || lobby.state !== 'in_question') return;
-    if (lobby.currentAnswers.has(socketId)) return;
-    lobby.playerDrafts.set(socketId, answer);
+    if (!lobby) return;
+    lyricsGuessMode.updateDraft(lobby, socketId, answer);
   }
 
   nextQuestion(socketId, io) {
     const lobby = this.getLobby(socketId);
-    if (!lobby || lobby.hostSocketId !== socketId || lobby.state !== 'reveal') return;
-    this._nextQuestion(lobby, io);
+    if (!lobby) return;
+    lyricsGuessMode.nextQuestion(lobby, socketId, io);
   }
 
-  _startQuestion(lobby, io) {
-    lobby.state = 'in_question';
-    lobby.currentAnswers = new Map();
-    lobby.playerDrafts = new Map();
-    lobby.questionStartTime = Date.now();
-    lobby.secondsRemaining = lobby.settings.timeLimit;
-
-    const q = lobby.questions[lobby.currentQuestionIndex];
-    io.to(lobby.id).emit('question-start', {
-      audioUrl: `/${q.audio}`,
-      charCount: normalizeText(q.answer).length,
-      hint: q.hint,
-      questionIndex: lobby.currentQuestionIndex + 1,
-      total: lobby.settings.numQuestions,
-      timeLimit: lobby.settings.timeLimit,
-    });
-
-    lobby.timerHandle = setInterval(() => {
-      lobby.secondsRemaining--;
-      io.to(lobby.id).emit('timer-tick', { secondsRemaining: lobby.secondsRemaining });
-      if (lobby.secondsRemaining <= 0) {
-        clearInterval(lobby.timerHandle);
-        lobby.timerHandle = null;
-        this._endQuestion(lobby, io);
-      }
-    }, 1000);
-  }
-
+  // Keep _endQuestion and _nextQuestion as delegation methods for backward compatibility
+  // (tests call mgr._endQuestion and mgr._nextQuestion directly)
   _endQuestion(lobby, io) {
-    if (lobby.state !== 'in_question') return;
-    lobby.state = 'reveal';
-
-    const q = lobby.questions[lobby.currentQuestionIndex];
-    const timeLimitMs = lobby.settings.timeLimit * 1000;
-
-    const results = lobby.players.map(player => {
-      const submission = lobby.currentAnswers.get(player.socketId);
-      let answer, submittedMs;
-      if (submission) {
-        answer = submission.answer;
-        submittedMs = submission.submittedMs;
-      } else {
-        answer = lobby.playerDrafts.get(player.socketId) ?? '';
-        submittedMs = null; // no speed bonus for auto-submitted drafts
-      }
-
-      const { accuracyScore, speedBonus, accuracy } = calculateScore(answer, q.answer, submittedMs, timeLimitMs);
-      const pointsEarned = accuracyScore + speedBonus;
-      player.score += pointsEarned;
-
-      return {
-        nickname: player.nickname,
-        answer,
-        accuracy: Math.round(accuracy * 100),
-        pointsEarned,
-        totalScore: player.score,
-      };
-    });
-
-    io.to(lobby.id).emit('question-end', { correctAnswer: q.answer, results });
+    lyricsGuessMode.endQuestion(lobby, io);
   }
 
   _nextQuestion(lobby, io) {
-    lobby.currentQuestionIndex++;
+    lyricsGuessMode.advanceQuestion(lobby, io);
+  }
 
-    if (lobby.currentQuestionIndex >= lobby.settings.numQuestions) {
-      lobby.state = 'finished';
-      const finalScores = [...lobby.players]
-        .sort((a, b) => b.score - a.score)
-        .map(p => ({ nickname: p.nickname, score: p.score }));
-      io.to(lobby.id).emit('game-over', { finalScores, winner: finalScores[0]?.nickname ?? '' });
-    } else {
-      this._startQuestion(lobby, io);
-    }
+  // Placeholder dispatch methods for telephone mode (wired in Task 4)
+  submitRecording(socketId, data, io) {
+    const lobby = this.getLobby(socketId);
+    if (!lobby) return;
+    // TODO: delegate to telephoneMode in Task 4
+  }
+
+  submitGuess(socketId, data, io) {
+    const lobby = this.getLobby(socketId);
+    if (!lobby) return;
+    // TODO: delegate to telephoneMode in Task 4
+  }
+
+  nextSong(socketId, io) {
+    const lobby = this.getLobby(socketId);
+    if (!lobby) return;
+    // TODO: delegate to telephoneMode in Task 4
   }
 
   _closeLobby(lobby, io, reason) {
