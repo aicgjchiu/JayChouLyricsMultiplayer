@@ -3,19 +3,24 @@ import socket from '../socket.js';
 import { useSocketEvent } from '../hooks/useSocket.js';
 
 export default function MainMenu({ nickname, setNickname }) {
-  const [view, setView] = useState('home'); // 'home' | 'create' | 'join'
+  const [view, setView] = useState('home'); // 'home' | 'create'
   const [lobbyList, setLobbyList] = useState([]);
   const [form, setForm] = useState({
     lobbyName: '', numQuestions: 10, timeLimit: 30, isPrivate: false, password: '',
   });
-  const [joinCode, setJoinCode] = useState('');
-  const [joinPassword, setJoinPassword] = useState('');
+  const [joiningPrivate, setJoiningPrivate] = useState(null); // { code } | null
+  const [privatePassword, setPrivatePassword] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
-    socket.emit('get-lobbies');
-    const interval = setInterval(() => socket.emit('get-lobbies'), 5000);
-    return () => clearInterval(interval);
+    const fetchLobbies = () => socket.emit('get-lobbies');
+    fetchLobbies();
+    socket.on('connect', fetchLobbies);
+    const interval = setInterval(fetchLobbies, 5000);
+    return () => {
+      socket.off('connect', fetchLobbies);
+      clearInterval(interval);
+    };
   }, []);
 
   useSocketEvent('lobby-list', useCallback((list) => setLobbyList(list), []));
@@ -35,22 +40,24 @@ export default function MainMenu({ nickname, setNickname }) {
     });
   }
 
-  function handleJoin(e) {
-    e.preventDefault();
-    if (!nickname.trim()) { setErrorMsg('請輸入暱稱'); return; }
-    if (!joinCode.trim()) { setErrorMsg('請輸入邀請碼'); return; }
+  function handleQuickJoin(lobby) {
+    if (!nickname.trim()) { setErrorMsg('請先輸入暱稱'); return; }
+    if (lobby.isPrivate) {
+      setJoiningPrivate({ code: lobby.code });
+      setPrivatePassword('');
+      return;
+    }
     setErrorMsg('');
-    socket.emit('join-lobby', {
-      lobbyCode: joinCode.trim().toUpperCase(),
-      nickname: nickname.trim(),
-      password: joinPassword || null,
-    });
+    socket.emit('join-lobby', { lobbyCode: lobby.code, nickname: nickname.trim(), password: null });
   }
 
-  function handleQuickJoin(code) {
+  function handlePrivateJoin(e) {
+    e.preventDefault();
     if (!nickname.trim()) { setErrorMsg('請先輸入暱稱'); return; }
     setErrorMsg('');
-    socket.emit('join-lobby', { lobbyCode: code, nickname: nickname.trim(), password: null });
+    socket.emit('join-lobby', { lobbyCode: joiningPrivate.code, nickname: nickname.trim(), password: privatePassword || null });
+    setJoiningPrivate(null);
+    setPrivatePassword('');
   }
 
   return (
@@ -72,22 +79,38 @@ export default function MainMenu({ nickname, setNickname }) {
 
       {view === 'home' && (
         <>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
-            <button onClick={() => setView('create')} style={{ flex: 1, padding: 10, fontSize: 16 }}>
+          <div style={{ marginBottom: 24 }}>
+            <button onClick={() => setView('create')} style={{ width: '100%', padding: 10, fontSize: 16 }}>
               建立 Lobby
-            </button>
-            <button onClick={() => setView('join')} style={{ flex: 1, padding: 10, fontSize: 16 }}>
-              加入 Lobby
             </button>
           </div>
 
-          <h3 style={{ marginBottom: 8 }}>公開 Lobbies</h3>
-          {lobbyList.length === 0 && <p style={{ color: '#888' }}>目前沒有公開 Lobby</p>}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <h3 style={{ margin: 0 }}>Lobbies</h3>
+            <button onClick={() => socket.emit('get-lobbies')} style={{ padding: '4px 10px', fontSize: 13 }}>重新整理</button>
+          </div>
+          {lobbyList.length === 0 && <p style={{ color: '#888' }}>目前沒有 Lobby</p>}
           {lobbyList.map(l => (
-            <div key={l.code} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #eee' }}>
-              <span>{l.name}</span>
-              <span style={{ color: '#888', fontSize: 14 }}>{l.playerCount}/{l.maxPlayers} 人</span>
-              <button onClick={() => handleQuickJoin(l.code)} style={{ padding: '4px 12px' }}>加入</button>
+            <div key={l.code}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #eee' }}>
+                <span>{l.isPrivate ? '🔒 ' : ''}{l.name}</span>
+                <span style={{ color: '#888', fontSize: 14 }}>{l.playerCount}/{l.maxPlayers} 人</span>
+                <button onClick={() => handleQuickJoin(l)} style={{ padding: '4px 12px' }}>加入</button>
+              </div>
+              {joiningPrivate?.code === l.code && (
+                <form onSubmit={handlePrivateJoin} style={{ padding: '8px 0', display: 'flex', gap: 8 }}>
+                  <input
+                    value={privatePassword}
+                    onChange={e => setPrivatePassword(e.target.value)}
+                    placeholder="輸入密碼"
+                    type="password"
+                    autoFocus
+                    style={{ flex: 1, padding: '6px 10px', boxSizing: 'border-box' }}
+                  />
+                  <button type="submit" style={{ padding: '6px 12px' }}>確認</button>
+                  <button type="button" onClick={() => setJoiningPrivate(null)} style={{ padding: '6px 12px' }}>取消</button>
+                </form>
+              )}
             </div>
           ))}
         </>
@@ -114,7 +137,7 @@ export default function MainMenu({ nickname, setNickname }) {
 
           <label>
             <input type="checkbox" checked={form.isPrivate} onChange={e => setForm(f => ({ ...f, isPrivate: e.target.checked }))} />
-            {' '}私人 Lobby
+            {' '}私人 Lobby（需要密碼）
           </label>
           {form.isPrivate && (
             <input value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
@@ -123,22 +146,6 @@ export default function MainMenu({ nickname, setNickname }) {
 
           <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
             <button type="submit" style={{ flex: 1, padding: 10 }}>建立</button>
-            <button type="button" onClick={() => setView('home')} style={{ flex: 1, padding: 10 }}>返回</button>
-          </div>
-        </form>
-      )}
-
-      {view === 'join' && (
-        <form onSubmit={handleJoin}>
-          <h3>加入 Lobby</h3>
-          <input value={joinCode} onChange={e => setJoinCode(e.target.value.toUpperCase())}
-            placeholder="邀請碼 (6 碼)" maxLength={6}
-            style={{ width: '100%', padding: '8px 12px', margin: '4px 0 12px', boxSizing: 'border-box', fontFamily: 'monospace', fontSize: 18, letterSpacing: 4 }} />
-          <input value={joinPassword} onChange={e => setJoinPassword(e.target.value)}
-            placeholder="密碼（私人 Lobby 才需要）" type="password"
-            style={{ width: '100%', padding: '6px 10px', margin: '4px 0 12px', boxSizing: 'border-box' }} />
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button type="submit" style={{ flex: 1, padding: 10 }}>加入</button>
             <button type="button" onClick={() => setView('home')} style={{ flex: 1, padding: 10 }}>返回</button>
           </div>
         </form>
