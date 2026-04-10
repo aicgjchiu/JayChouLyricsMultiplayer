@@ -22,7 +22,7 @@ app.get('*', (_req, res) => {
 
 io.on('connection', (socket) => {
   socket.on('get-lobbies', () => {
-    socket.emit('lobby-list', manager.getPublicLobbies());
+    socket.emit('lobby-list', manager.getLobbies());
   });
 
   socket.on('create-lobby', (data) => {

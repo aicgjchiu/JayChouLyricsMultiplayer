@@ -132,6 +132,8 @@ describe('GameManager.getLobbies', () => {
     mgr.createLobby('h1', { nickname: 'H1', lobbyName: 'Waiting', numQuestions: 5, timeLimit: 30, isPrivate: false, password: null });
     const inProg = mgr.createLobby('h2', { nickname: 'H2', lobbyName: 'InProgress', numQuestions: 5, timeLimit: 30, isPrivate: false, password: null });
     inProg.state = 'in_question';
+    const finished = mgr.createLobby('h3', { nickname: 'H3', lobbyName: 'Finished', numQuestions: 5, timeLimit: 30, isPrivate: false, password: null });
+    finished.state = 'finished';
     const list = mgr.getLobbies();
     expect(list).toHaveLength(1);
     expect(list[0].name).toBe('Waiting');
