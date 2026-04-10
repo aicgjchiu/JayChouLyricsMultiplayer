@@ -176,6 +176,7 @@ export class GameManager {
     lobby.players.forEach(p => { p.score = 0; });
     lobby.telephone = null;
 
+    io.to(lobby.id).emit('lobby-restarted');
     io.to(lobby.id).emit('lobby-updated', this.lobbyPayload(lobby));
   }
 

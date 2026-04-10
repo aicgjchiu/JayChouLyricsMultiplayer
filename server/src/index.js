@@ -84,7 +84,10 @@ io.on('connection', (socket) => {
   socket.on('update-settings', (data) => manager.updateSettings(socket.id, data, io));
 
   socket.on('leave-lobby', () => {
+    const lobby = manager.getLobby(socket.id);
+    const roomId = lobby?.id;
     manager.leaveLobby(socket.id, io);
+    if (roomId) socket.leave(roomId);
     broadcastLobbyList();
   });
 

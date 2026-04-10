@@ -83,6 +83,16 @@ export default function App() {
     }
   }, []));
 
+  useSocketEvent('lobby-restarted', useCallback(() => {
+    setPage('lobby');
+    setQuestion(null);
+    setRevealData(null);
+    setFinalData(null);
+    setPhonePhase(null);
+    setPhoneGuess(null);
+    setPhoneResults(null);
+  }, []));
+
   useSocketEvent('kicked-to-menu', useCallback(() => {
     setPage('menu');
     setLobby(null);
