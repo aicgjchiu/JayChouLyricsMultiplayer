@@ -1,0 +1,239 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { GameManager } from '../src/gameManager.js';
+
+function makeMockIo() {
+  const emitFn = vi.fn();
+  const toObj = { emit: emitFn };
+  return {
+    to: vi.fn().mockReturnValue(toObj),
+    _emitFn: emitFn,
+  };
+}
+
+function createTelephoneLobby(mgr, playerCount) {
+  const lobby = mgr.createLobby('host', {
+    nickname: 'Host', lobbyName: 'Room', isPrivate: false, password: null,
+    gameMode: 'telephone', phaseDuration: 90,
+  });
+  for (let i = 2; i <= playerCount; i++) {
+    mgr.joinLobby(`p${i}`, { lobbyCode: lobby.id, nickname: `Player${i}`, password: null });
+  }
+  return lobby;
+}
+
+describe('Telephone mode: startGame', () => {
+  it('rejects if fewer than 3 players', () => {
+    const mgr = new GameManager();
+    const lobby = createTelephoneLobby(mgr, 2);
+    const io = makeMockIo();
+    mgr.startGame('host', io);
+    expect(lobby.state).toBe('waiting');
+  });
+
+  it('transitions to telephone_phase with 3 players', () => {
+    const mgr = new GameManager();
+    const lobby = createTelephoneLobby(mgr, 3);
+    const io = makeMockIo();
+    mgr.startGame('host', io);
+    expect(lobby.state).toBe('telephone_phase');
+    expect(lobby.telephone).not.toBeNull();
+    expect(lobby.telephone.currentPhase).toBe(0);
+    expect(lobby.telephone.songs).toHaveLength(3);
+    expect(lobby.telephone.lyrics).toHaveLength(3);
+    if (lobby.timerHandle) clearInterval(lobby.timerHandle);
+  });
+
+  it('emits telephone-phase-start to each player with their assignment', () => {
+    const mgr = new GameManager();
+    const lobby = createTelephoneLobby(mgr, 3);
+    const sockets = new Map();
+    const mockSocketEmits = {};
+    lobby.players.forEach(p => {
+      mockSocketEmits[p.socketId] = vi.fn();
+      sockets.set(p.socketId, { emit: mockSocketEmits[p.socketId] });
+    });
+    const io = makeMockIo();
+    io.to = vi.fn().mockImplementation((roomOrId) => {
+      if (sockets.has(roomOrId)) {
+        return { emit: sockets.get(roomOrId).emit };
+      }
+      return { emit: io._emitFn };
+    });
+
+    mgr.startGame('host', io);
+
+    lobby.players.forEach(p => {
+      expect(mockSocketEmits[p.socketId]).toHaveBeenCalledWith(
+        'telephone-phase-start',
+        expect.objectContaining({
+          phaseIndex: 0,
+          lyrics: expect.any(String),
+          audioType: 'youtube',
+          phaseDuration: 90,
+          isFirstPhase: true,
+        })
+      );
+    });
+
+    if (lobby.timerHandle) clearInterval(lobby.timerHandle);
+  });
+
+  it('filters lyrics to avoid matching song names', () => {
+    const mgr = new GameManager();
+    const lobby = createTelephoneLobby(mgr, 3);
+    const io = makeMockIo();
+    mgr.startGame('host', io);
+
+    const songNames = lobby.telephone.songs.map(s => s.name);
+    lobby.telephone.lyrics.forEach(l => {
+      expect(songNames).not.toContain(l.songName);
+    });
+
+    if (lobby.timerHandle) clearInterval(lobby.timerHandle);
+  });
+});
+
+describe('Telephone mode: submitRecording', () => {
+  it('stores recording and marks player as submitted', () => {
+    const mgr = new GameManager();
+    const lobby = createTelephoneLobby(mgr, 3);
+    const io = makeMockIo();
+    mgr.startGame('host', io);
+
+    const audioBuffer = Buffer.from('fake-audio-data');
+    mgr.submitRecording('host', audioBuffer, io);
+
+    expect(lobby.telephone.submissions.has('host')).toBe(true);
+    expect(lobby.telephone.recordings.size).toBe(1);
+
+    if (lobby.timerHandle) clearInterval(lobby.timerHandle);
+  });
+
+  it('advances to next phase when all players submit', () => {
+    const mgr = new GameManager();
+    const lobby = createTelephoneLobby(mgr, 3);
+    const io = makeMockIo();
+    mgr.startGame('host', io);
+    if (lobby.timerHandle) { clearInterval(lobby.timerHandle); lobby.timerHandle = null; }
+
+    const buf = Buffer.from('audio');
+    mgr.submitRecording('host', buf, io);
+    mgr.submitRecording('p2', buf, io);
+    mgr.submitRecording('p3', buf, io);
+
+    expect(lobby.state).toBe('telephone_phase');
+    expect(lobby.telephone.currentPhase).toBe(1);
+
+    if (lobby.timerHandle) clearInterval(lobby.timerHandle);
+  });
+
+  it('advances to telephone_guess after all singing phases', () => {
+    const mgr = new GameManager();
+    const lobby = createTelephoneLobby(mgr, 3);
+    const io = makeMockIo();
+    mgr.startGame('host', io);
+    if (lobby.timerHandle) { clearInterval(lobby.timerHandle); lobby.timerHandle = null; }
+
+    const buf = Buffer.from('audio');
+
+    // Phase 0
+    mgr.submitRecording('host', buf, io);
+    mgr.submitRecording('p2', buf, io);
+    mgr.submitRecording('p3', buf, io);
+    if (lobby.timerHandle) { clearInterval(lobby.timerHandle); lobby.timerHandle = null; }
+
+    // Phase 1 (last singing phase for N=3)
+    mgr.submitRecording('host', buf, io);
+    mgr.submitRecording('p2', buf, io);
+    mgr.submitRecording('p3', buf, io);
+
+    expect(lobby.state).toBe('telephone_guess');
+
+    if (lobby.timerHandle) clearInterval(lobby.timerHandle);
+  });
+});
+
+describe('Telephone mode: submitGuess', () => {
+  it('transitions to telephone_results when all players guess', () => {
+    const mgr = new GameManager();
+    const lobby = createTelephoneLobby(mgr, 3);
+    const io = makeMockIo();
+    mgr.startGame('host', io);
+    if (lobby.timerHandle) { clearInterval(lobby.timerHandle); lobby.timerHandle = null; }
+
+    const buf = Buffer.from('audio');
+    for (let phase = 0; phase < lobby.players.length - 1; phase++) {
+      lobby.players.forEach(p => mgr.submitRecording(p.socketId, buf, io));
+      if (lobby.timerHandle) { clearInterval(lobby.timerHandle); lobby.timerHandle = null; }
+    }
+    expect(lobby.state).toBe('telephone_guess');
+
+    mgr.submitGuess('host', '太陽之子', io);
+    mgr.submitGuess('p2', '西西里', io);
+    mgr.submitGuess('p3', '那天下雨了', io);
+
+    expect(lobby.state).toBe('telephone_results');
+
+    if (lobby.timerHandle) clearInterval(lobby.timerHandle);
+  });
+});
+
+describe('Telephone mode: nextSong', () => {
+  function advanceToResults(mgr, lobby, io) {
+    const buf = Buffer.from('audio');
+    for (let phase = 0; phase < lobby.players.length - 1; phase++) {
+      lobby.players.forEach(p => mgr.submitRecording(p.socketId, buf, io));
+      if (lobby.timerHandle) { clearInterval(lobby.timerHandle); lobby.timerHandle = null; }
+    }
+    lobby.players.forEach(p => mgr.submitGuess(p.socketId, 'guess', io));
+    if (lobby.timerHandle) { clearInterval(lobby.timerHandle); lobby.timerHandle = null; }
+  }
+
+  it('advances to next song in results when host calls', () => {
+    const mgr = new GameManager();
+    const lobby = createTelephoneLobby(mgr, 3);
+    const io = makeMockIo();
+    mgr.startGame('host', io);
+    if (lobby.timerHandle) { clearInterval(lobby.timerHandle); lobby.timerHandle = null; }
+
+    advanceToResults(mgr, lobby, io);
+    expect(lobby.state).toBe('telephone_results');
+    expect(lobby.telephone.currentResultSong).toBe(0);
+
+    mgr.nextSong('host', io);
+    expect(lobby.telephone.currentResultSong).toBe(1);
+
+    if (lobby.timerHandle) clearInterval(lobby.timerHandle);
+  });
+
+  it('transitions to finished after all songs shown', () => {
+    const mgr = new GameManager();
+    const lobby = createTelephoneLobby(mgr, 3);
+    const io = makeMockIo();
+    mgr.startGame('host', io);
+    if (lobby.timerHandle) { clearInterval(lobby.timerHandle); lobby.timerHandle = null; }
+
+    advanceToResults(mgr, lobby, io);
+
+    mgr.nextSong('host', io);
+    mgr.nextSong('host', io);
+    mgr.nextSong('host', io);
+
+    expect(lobby.state).toBe('finished');
+
+    if (lobby.timerHandle) clearInterval(lobby.timerHandle);
+  });
+
+  it('rejects if caller is not host', () => {
+    const mgr = new GameManager();
+    const lobby = createTelephoneLobby(mgr, 3);
+    const io = makeMockIo();
+    mgr.startGame('host', io);
+    if (lobby.timerHandle) { clearInterval(lobby.timerHandle); lobby.timerHandle = null; }
+
+    advanceToResults(mgr, lobby, io);
+
+    mgr.nextSong('p2', io);
+    expect(lobby.telephone.currentResultSong).toBe(0);
+  });
+});

@@ -1,6 +1,7 @@
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import * as lyricsGuessMode from './modes/lyricsGuess.js';
+import * as telephoneMode from './modes/telephone.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -154,7 +155,7 @@ export class GameManager {
 
     if (lobby.settings.gameMode === 'telephone') {
       if (lobby.players.length < 3) return;
-      // Telephone mode start is handled in Task 4
+      telephoneMode.startGame(lobby, io);
       return;
     }
 
@@ -216,23 +217,22 @@ export class GameManager {
     lyricsGuessMode.advanceQuestion(lobby, io);
   }
 
-  // Placeholder dispatch methods for telephone mode (wired in Task 4)
-  submitRecording(socketId, data, io) {
+  submitRecording(socketId, audioBuffer, io) {
     const lobby = this.getLobby(socketId);
     if (!lobby) return;
-    // TODO: delegate to telephoneMode in Task 4
+    telephoneMode.submitRecording(lobby, socketId, audioBuffer, io);
   }
 
-  submitGuess(socketId, data, io) {
+  submitGuess(socketId, guess, io) {
     const lobby = this.getLobby(socketId);
     if (!lobby) return;
-    // TODO: delegate to telephoneMode in Task 4
+    telephoneMode.submitGuess(lobby, socketId, guess, io);
   }
 
   nextSong(socketId, io) {
     const lobby = this.getLobby(socketId);
     if (!lobby) return;
-    // TODO: delegate to telephoneMode in Task 4
+    telephoneMode.nextSong(lobby, socketId, io);
   }
 
   _closeLobby(lobby, io, reason) {
