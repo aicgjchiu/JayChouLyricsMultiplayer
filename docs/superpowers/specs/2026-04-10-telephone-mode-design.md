@@ -157,7 +157,7 @@ waiting → telephone_phase → telephone_guess → telephone_results → finish
      isFirstPhase       // true for phase 1
    }
    ```
-2. Player listens to audio (can replay freely).
+2. Player listens to audio (can replay freely). An instruction is displayed: **"請用提供的歌詞，搭配你聽到的旋律來唱歌"** (Sing the provided lyrics using the melody from the audio you heard).
 3. Player clicks "Start Recording" — **warning shown first**: "開始錄音後，將無法再聽到音樂". Audio becomes permanently unplayable.
 4. Player records via MediaRecorder API. Red recording indicator shown.
 5. Player clicks "Stop Recording" — preview plays back. Player can:
