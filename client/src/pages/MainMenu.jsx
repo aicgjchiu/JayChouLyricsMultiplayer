@@ -8,7 +8,7 @@ export default function MainMenu({ nickname, setNickname }) {
   const [form, setForm] = useState({
     lobbyName: '', numQuestions: 10, timeLimit: 30, isPrivate: false, password: '',
   });
-  const [joiningPrivate, setJoiningPrivate] = useState(null); // { code } | null
+  const [joiningPrivate, setJoiningPrivate] = useState(null); // lobby object | null
   const [privatePassword, setPrivatePassword] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -43,7 +43,7 @@ export default function MainMenu({ nickname, setNickname }) {
   function handleQuickJoin(lobby) {
     if (!nickname.trim()) { setErrorMsg('請先輸入暱稱'); return; }
     if (lobby.isPrivate) {
-      setJoiningPrivate({ code: lobby.code });
+      setJoiningPrivate(lobby);
       setPrivatePassword('');
       return;
     }
@@ -56,8 +56,6 @@ export default function MainMenu({ nickname, setNickname }) {
     if (!nickname.trim()) { setErrorMsg('請先輸入暱稱'); return; }
     setErrorMsg('');
     socket.emit('join-lobby', { lobbyCode: joiningPrivate.code, nickname: nickname.trim(), password: privatePassword || null });
-    setJoiningPrivate(null);
-    setPrivatePassword('');
   }
 
   return (
@@ -95,20 +93,24 @@ export default function MainMenu({ nickname, setNickname }) {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #eee' }}>
                 <span>{l.isPrivate ? '🔒 ' : ''}{l.name}</span>
                 <span style={{ color: '#888', fontSize: 14 }}>{l.playerCount}/{l.maxPlayers} 人</span>
-                <button onClick={() => handleQuickJoin(l)} style={{ padding: '4px 12px' }}>加入</button>
+                <button
+                  onClick={() => handleQuickJoin(l)}
+                  disabled={l.playerCount >= l.maxPlayers}
+                  style={{ padding: '4px 12px', opacity: l.playerCount >= l.maxPlayers ? 0.4 : 1, cursor: l.playerCount >= l.maxPlayers ? 'not-allowed' : 'pointer' }}
+                >加入</button>
               </div>
               {joiningPrivate?.code === l.code && (
                 <form onSubmit={handlePrivateJoin} style={{ padding: '8px 0', display: 'flex', gap: 8 }}>
                   <input
                     value={privatePassword}
                     onChange={e => setPrivatePassword(e.target.value)}
-                    placeholder="輸入密碼"
+                    placeholder={`「${joiningPrivate.name}」的密碼`}
                     type="password"
                     autoFocus
                     style={{ flex: 1, padding: '6px 10px', boxSizing: 'border-box' }}
                   />
                   <button type="submit" style={{ padding: '6px 12px' }}>確認</button>
-                  <button type="button" onClick={() => setJoiningPrivate(null)} style={{ padding: '6px 12px' }}>取消</button>
+                  <button type="button" onClick={() => { setJoiningPrivate(null); setErrorMsg(''); }} style={{ padding: '6px 12px' }}>取消</button>
                 </form>
               )}
             </div>
