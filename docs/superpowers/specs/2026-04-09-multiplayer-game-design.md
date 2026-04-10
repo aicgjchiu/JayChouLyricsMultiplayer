@@ -169,9 +169,12 @@ No answer submitted = 0 pts.
 
 ### Answer Matching Algorithm
 
-1. Strip all punctuation and whitespace from both the correct answer and the player's input
-2. Compute Longest Common Subsequence (LCS) of the two normalized strings
-3. `matchingChars = LCS length`, `totalChars = normalized correct answer length`
+1. **Convert player input from Simplified to Traditional Chinese** using [OpenCC](https://github.com/nk2028/opencc-js) (`s2t` mode) — so simplified Chinese typists score correctly
+2. Strip all punctuation and whitespace from both the correct answer and the converted player input
+3. Compute Longest Common Subsequence (LCS) of the two normalized strings
+4. `matchingChars = LCS length`, `totalChars = normalized correct answer length`
+
+The correct answer in `questions.json` is already Traditional Chinese, so no conversion is needed on that side. Conversion runs server-side in `scoring.js` at score-calculation time.
 
 ### UI During Question
 
