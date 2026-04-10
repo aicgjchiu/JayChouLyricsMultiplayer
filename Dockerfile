@@ -17,6 +17,8 @@ COPY server/ ./server/
 
 # Copy game assets
 COPY questions.json ./
+COPY songs.json ./
+COPY lyrics.json ./
 COPY audio/ ./audio/
 
 # Copy built React app
