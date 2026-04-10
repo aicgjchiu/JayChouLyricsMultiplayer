@@ -251,3 +251,115 @@ describe('GameManager.submitAnswer', () => {
     if (lobby.revealTimer) clearTimeout(lobby.revealTimer);
   });
 });
+
+describe('GameManager.updateDraft', () => {
+  it('stores draft for a player in an active question', () => {
+    const mgr = new GameManager();
+    const lobby = mgr.createLobby('host', {
+      nickname: 'Host', lobbyName: 'Room', numQuestions: 5, timeLimit: 30,
+      isPrivate: false, password: null,
+    });
+    mgr.joinLobby('p2', { lobbyCode: lobby.id, nickname: 'Player2', password: null });
+    const io = makeMockIo();
+    mgr.startGame('host', io);
+
+    mgr.updateDraft('p2', '測試歌詞');
+    expect(lobby.playerDrafts.get('p2')).toBe('測試歌詞');
+
+    if (lobby.timerHandle) clearInterval(lobby.timerHandle);
+  });
+
+  it('ignores draft if the player has already explicitly submitted', () => {
+    const mgr = new GameManager();
+    const lobby = mgr.createLobby('host', {
+      nickname: 'Host', lobbyName: 'Room', numQuestions: 5, timeLimit: 30,
+      isPrivate: false, password: null,
+    });
+    mgr.joinLobby('p2', { lobbyCode: lobby.id, nickname: 'Player2', password: null });
+    const io = makeMockIo();
+    mgr.startGame('host', io);
+
+    mgr.submitAnswer('p2', { answer: '正式提交' }, io);
+    mgr.updateDraft('p2', '草稿覆蓋');
+
+    expect(lobby.currentAnswers.get('p2').answer).toBe('正式提交');
+
+    if (lobby.timerHandle) clearInterval(lobby.timerHandle);
+    if (lobby.revealTimer) clearTimeout(lobby.revealTimer);
+  });
+
+  it('ignores draft if lobby is not in_question', () => {
+    const mgr = new GameManager();
+    const lobby = mgr.createLobby('host', {
+      nickname: 'Host', lobbyName: 'Room', numQuestions: 5, timeLimit: 30,
+      isPrivate: false, password: null,
+    });
+    mgr.joinLobby('p2', { lobbyCode: lobby.id, nickname: 'Player2', password: null });
+    mgr.updateDraft('p2', '草稿');
+    expect(lobby.playerDrafts.size).toBe(0);
+  });
+
+  it('clears playerDrafts when a new question starts', () => {
+    const mgr = new GameManager();
+    const lobby = mgr.createLobby('host', {
+      nickname: 'Host', lobbyName: 'Room', numQuestions: 5, timeLimit: 30,
+      isPrivate: false, password: null,
+    });
+    mgr.joinLobby('p2', { lobbyCode: lobby.id, nickname: 'Player2', password: null });
+    lobby.playerDrafts = new Map([['p2', 'old draft']]);
+
+    const io = makeMockIo();
+    mgr.startGame('host', io);
+    expect(lobby.playerDrafts.size).toBe(0);
+
+    if (lobby.timerHandle) clearInterval(lobby.timerHandle);
+  });
+});
+
+describe('GameManager._endQuestion draft fallback', () => {
+  it('uses stored draft with no speed bonus for unsubmitted players', () => {
+    const mgr = new GameManager();
+    const lobby = mgr.createLobby('host', {
+      nickname: 'Host', lobbyName: 'Room', numQuestions: 5, timeLimit: 30,
+      isPrivate: false, password: null,
+    });
+    mgr.joinLobby('p2', { lobbyCode: lobby.id, nickname: 'Player2', password: null });
+    const io = makeMockIo();
+    mgr.startGame('host', io);
+
+    mgr.updateDraft('p2', '太陽之子');
+    mgr.submitAnswer('host', { answer: '答案' }, io);
+    io._emitFn.mockClear();
+    io.to.mockClear();
+
+    if (lobby.timerHandle) { clearInterval(lobby.timerHandle); lobby.timerHandle = null; }
+    mgr._endQuestion(lobby, io);
+
+    const [, payload] = io._emitFn.mock.calls.find(([event]) => event === 'question-end');
+    const p2Result = payload.results.find(r => r.nickname === 'Player2');
+    expect(p2Result.answer).toBe('太陽之子');
+
+    if (lobby.revealTimer) clearTimeout(lobby.revealTimer);
+  });
+
+  it('uses empty string with zero points for players with no submission and no draft', () => {
+    const mgr = new GameManager();
+    const lobby = mgr.createLobby('host', {
+      nickname: 'Host', lobbyName: 'Room', numQuestions: 5, timeLimit: 30,
+      isPrivate: false, password: null,
+    });
+    mgr.joinLobby('p2', { lobbyCode: lobby.id, nickname: 'Player2', password: null });
+    const io = makeMockIo();
+    mgr.startGame('host', io);
+
+    if (lobby.timerHandle) { clearInterval(lobby.timerHandle); lobby.timerHandle = null; }
+    mgr._endQuestion(lobby, io);
+
+    const [, payload] = io._emitFn.mock.calls.find(([event]) => event === 'question-end');
+    const p2Result = payload.results.find(r => r.nickname === 'Player2');
+    expect(p2Result.answer).toBe('');
+    expect(p2Result.pointsEarned).toBe(0);
+
+    if (lobby.revealTimer) clearTimeout(lobby.revealTimer);
+  });
+});

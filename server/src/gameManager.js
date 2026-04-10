@@ -63,6 +63,7 @@ export class GameManager {
       questions: [],
       currentQuestionIndex: 0,
       currentAnswers: new Map(),
+      playerDrafts: new Map(),
       timerHandle: null,
       revealTimer: null,
       questionStartTime: null,
@@ -182,9 +183,17 @@ export class GameManager {
     }
   }
 
+  updateDraft(socketId, answer) {
+    const lobby = this.getLobby(socketId);
+    if (!lobby || lobby.state !== 'in_question') return;
+    if (lobby.currentAnswers.has(socketId)) return;
+    lobby.playerDrafts.set(socketId, answer);
+  }
+
   _startQuestion(lobby, io) {
     lobby.state = 'in_question';
     lobby.currentAnswers = new Map();
+    lobby.playerDrafts = new Map();
     lobby.questionStartTime = Date.now();
     lobby.secondsRemaining = lobby.settings.timeLimit;
 
@@ -218,8 +227,14 @@ export class GameManager {
 
     const results = lobby.players.map(player => {
       const submission = lobby.currentAnswers.get(player.socketId);
-      const answer = submission?.answer ?? '';
-      const submittedMs = submission?.submittedMs ?? null;
+      let answer, submittedMs;
+      if (submission) {
+        answer = submission.answer;
+        submittedMs = submission.submittedMs;
+      } else {
+        answer = lobby.playerDrafts.get(player.socketId) ?? '';
+        submittedMs = null; // no speed bonus for auto-submitted drafts
+      }
 
       const { accuracyScore, speedBonus, accuracy } = calculateScore(answer, q.answer, submittedMs, timeLimitMs);
       const pointsEarned = accuracyScore + speedBonus;
