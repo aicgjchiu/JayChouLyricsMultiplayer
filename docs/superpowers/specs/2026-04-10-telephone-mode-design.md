@@ -32,16 +32,16 @@ One entry per song. Each song has a YouTube video ID and a timestamp segment (~5
 
 ### `lyrics.json`
 
-A flat pool of short singable phrases (~5 seconds). No association to any specific song — the game intentionally assigns mismatched lyrics to melodies.
+A flat pool of short singable phrases (~5 seconds). Each entry includes a `songName` field indicating which song the lyrics originate from, used to prevent accidental matches.
 
 ```json
 [
-  { "id": 1, "text": "我就是光照亮遠方黑夜我闖馬上將你擊潰" },
-  { "id": 2, "text": "天青色等煙雨而我在等妳" }
+  { "id": 1, "songName": "太陽之子", "text": "我就是光照亮遠方黑夜我闖馬上將你擊潰" },
+  { "id": 2, "songName": "七月的極光", "text": "天青色等煙雨而我在等妳" }
 ]
 ```
 
-At game start, N songs and N lyrics are randomly selected from these pools (N = player count).
+At game start: N songs are randomly selected from `songs.json`. Then the lyrics pool is **filtered to exclude any lyrics whose `songName` matches any selected song's `name`**. N lyrics are picked from the remaining pool. This guarantees every lyric is mismatched with every song in the game.
 
 ---
 
