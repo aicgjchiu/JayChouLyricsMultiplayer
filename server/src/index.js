@@ -65,7 +65,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    const wasInLobby = manager.socketToLobby.has(socket.id);
+    const wasInLobby = manager.getLobby(socket.id) !== null;
     manager.handleDisconnect(socket.id, io);
     if (wasInLobby) broadcastLobbyList();
   });

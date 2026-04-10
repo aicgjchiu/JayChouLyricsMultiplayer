@@ -43,6 +43,7 @@ export default function MainMenu({ nickname, setNickname }) {
   function handleQuickJoin(lobby) {
     if (!nickname.trim()) { setErrorMsg('請先輸入暱稱'); return; }
     if (lobby.isPrivate) {
+      setErrorMsg('');
       setJoiningPrivate(lobby);
       setPrivatePassword('');
       return;
@@ -55,6 +56,8 @@ export default function MainMenu({ nickname, setNickname }) {
     e.preventDefault();
     if (!nickname.trim()) { setErrorMsg('請先輸入暱稱'); return; }
     setErrorMsg('');
+    // joiningPrivate is intentionally not cleared here — keeps form open on wrong-password error.
+    // On success, App.jsx navigates away and unmounts MainMenu, clearing state implicitly.
     socket.emit('join-lobby', { lobbyCode: joiningPrivate.code, nickname: nickname.trim(), password: privatePassword || null });
   }
 
