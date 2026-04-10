@@ -11,6 +11,10 @@ const httpServer = createServer(app);
 const io = new Server(httpServer, { cors: { origin: '*' } });
 const manager = new GameManager();
 
+function broadcastLobbyList() {
+  io.emit('lobby-list', manager.getLobbies());
+}
+
 // Serve audio files
 app.use('/audio', express.static(join(__dirname, '../../audio')));
 
@@ -30,6 +34,7 @@ io.on('connection', (socket) => {
     socket.join(lobby.id);
     socket.emit('joined-lobby', { code: lobby.id });
     io.to(lobby.id).emit('lobby-updated', manager.lobbyPayload(lobby));
+    broadcastLobbyList();
   });
 
   socket.on('join-lobby', (data) => {
@@ -38,6 +43,7 @@ io.on('connection', (socket) => {
     socket.join(result.lobby.id);
     socket.emit('joined-lobby', { code: result.lobby.id });
     io.to(result.lobby.id).emit('lobby-updated', manager.lobbyPayload(result.lobby));
+    broadcastLobbyList();
   });
 
   socket.on('start-game', () => manager.startGame(socket.id, io));
@@ -47,9 +53,15 @@ io.on('connection', (socket) => {
   socket.on('restart-lobby', () => manager.restartLobby(socket.id, io));
   socket.on('update-settings', (data) => manager.updateSettings(socket.id, data, io));
 
-  socket.on('leave-lobby', () => manager.leaveLobby(socket.id, io));
+  socket.on('leave-lobby', () => {
+    manager.leaveLobby(socket.id, io);
+    broadcastLobbyList();
+  });
 
-  socket.on('disconnect', () => manager.handleDisconnect(socket.id, io));
+  socket.on('disconnect', () => {
+    manager.handleDisconnect(socket.id, io);
+    broadcastLobbyList();
+  });
 });
 
 const PORT = process.env.PORT || 3000;
