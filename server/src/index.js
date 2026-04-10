@@ -46,11 +46,17 @@ io.on('connection', (socket) => {
     broadcastLobbyList();
   });
 
-  socket.on('start-game', () => manager.startGame(socket.id, io));
+  socket.on('start-game', () => {
+    manager.startGame(socket.id, io);
+    broadcastLobbyList();
+  });
 
   socket.on('submit-answer', (data) => manager.submitAnswer(socket.id, data, io));
 
-  socket.on('restart-lobby', () => manager.restartLobby(socket.id, io));
+  socket.on('restart-lobby', () => {
+    manager.restartLobby(socket.id, io);
+    broadcastLobbyList();
+  });
   socket.on('update-settings', (data) => manager.updateSettings(socket.id, data, io));
 
   socket.on('leave-lobby', () => {
@@ -59,8 +65,9 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
+    const wasInLobby = manager.socketToLobby.has(socket.id);
     manager.handleDisconnect(socket.id, io);
-    broadcastLobbyList();
+    if (wasInLobby) broadcastLobbyList();
   });
 });
 
