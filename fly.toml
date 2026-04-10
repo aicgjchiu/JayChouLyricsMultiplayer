@@ -1,4 +1,4 @@
-app = "jay-chou-lyrics"
+app = "jay-chou-lyrics-game"
 primary_region = "nrt"
 
 [build]
