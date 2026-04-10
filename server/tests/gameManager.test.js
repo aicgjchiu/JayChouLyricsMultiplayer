@@ -124,3 +124,115 @@ describe('GameManager.getPublicLobbies', () => {
     expect(list[0].name).toBe('Public');
   });
 });
+
+describe('GameManager.startGame', () => {
+  it('rejects if socket is not host', () => {
+    const mgr = new GameManager();
+    const lobby = mgr.createLobby('host', {
+      nickname: 'Host', lobbyName: 'Room', numQuestions: 5, timeLimit: 30,
+      isPrivate: false, password: null,
+    });
+    mgr.joinLobby('p2', { lobbyCode: lobby.id, nickname: 'Player2', password: null });
+    const io = makeMockIo();
+    mgr.startGame('p2', io);
+    expect(lobby.state).toBe('waiting'); // state unchanged
+  });
+
+  it('rejects if fewer than 2 players', () => {
+    const mgr = new GameManager();
+    const lobby = mgr.createLobby('host', {
+      nickname: 'Host', lobbyName: 'Room', numQuestions: 5, timeLimit: 30,
+      isPrivate: false, password: null,
+    });
+    const io = makeMockIo();
+    mgr.startGame('host', io);
+    expect(lobby.state).toBe('waiting');
+  });
+
+  it('transitions to in_question and emits question-start', () => {
+    const mgr = new GameManager();
+    const lobby = mgr.createLobby('host', {
+      nickname: 'Host', lobbyName: 'Room', numQuestions: 5, timeLimit: 30,
+      isPrivate: false, password: null,
+    });
+    mgr.joinLobby('p2', { lobbyCode: lobby.id, nickname: 'Player2', password: null });
+    const io = makeMockIo();
+    mgr.startGame('host', io);
+    expect(lobby.state).toBe('in_question');
+    expect(io.to).toHaveBeenCalledWith(lobby.id);
+    expect(io._emitFn).toHaveBeenCalledWith('question-start', expect.objectContaining({
+      questionIndex: 1,
+      total: 5,
+      timeLimit: 30,
+    }));
+    // Clean up timer
+    if (lobby.timerHandle) clearInterval(lobby.timerHandle);
+  });
+});
+
+describe('GameManager.submitAnswer', () => {
+  it('records submission and emits player-submitted', () => {
+    const mgr = new GameManager();
+    const lobby = mgr.createLobby('host', {
+      nickname: 'Host', lobbyName: 'Room', numQuestions: 5, timeLimit: 30,
+      isPrivate: false, password: null,
+    });
+    mgr.joinLobby('p2', { lobbyCode: lobby.id, nickname: 'Player2', password: null });
+    const io = makeMockIo();
+    mgr.startGame('host', io);
+    io._emitFn.mockClear();
+    io.to.mockClear();
+
+    mgr.submitAnswer('host', { answer: '測試' }, io);
+    expect(lobby.currentAnswers.has('host')).toBe(true);
+    expect(io._emitFn).toHaveBeenCalledWith('player-submitted', { nickname: 'Host' });
+
+    // Clean up timer
+    if (lobby.timerHandle) clearInterval(lobby.timerHandle);
+    if (lobby.revealTimer) clearTimeout(lobby.revealTimer);
+  });
+
+  it('ignores duplicate submissions from same player', () => {
+    const mgr = new GameManager();
+    const lobby = mgr.createLobby('host', {
+      nickname: 'Host', lobbyName: 'Room', numQuestions: 5, timeLimit: 30,
+      isPrivate: false, password: null,
+    });
+    mgr.joinLobby('p2', { lobbyCode: lobby.id, nickname: 'Player2', password: null });
+    const io = makeMockIo();
+    mgr.startGame('host', io);
+
+    mgr.submitAnswer('host', { answer: '測試' }, io);
+    const sizeAfterFirst = lobby.currentAnswers.size;
+    mgr.submitAnswer('host', { answer: '再次' }, io);
+    expect(lobby.currentAnswers.size).toBe(sizeAfterFirst);
+
+    if (lobby.timerHandle) clearInterval(lobby.timerHandle);
+    if (lobby.revealTimer) clearTimeout(lobby.revealTimer);
+  });
+
+  it('emits question-end when all players submit', () => {
+    const mgr = new GameManager();
+    const lobby = mgr.createLobby('host', {
+      nickname: 'Host', lobbyName: 'Room', numQuestions: 5, timeLimit: 30,
+      isPrivate: false, password: null,
+    });
+    mgr.joinLobby('p2', { lobbyCode: lobby.id, nickname: 'Player2', password: null });
+    const io = makeMockIo();
+    mgr.startGame('host', io);
+
+    mgr.submitAnswer('host', { answer: '測試' }, io);
+    mgr.submitAnswer('p2', { answer: '歌詞' }, io);
+
+    expect(lobby.state).toBe('reveal');
+    expect(io._emitFn).toHaveBeenCalledWith('question-end', expect.objectContaining({
+      correctAnswer: expect.any(String),
+      results: expect.arrayContaining([
+        expect.objectContaining({ nickname: 'Host' }),
+        expect.objectContaining({ nickname: 'Player2' }),
+      ]),
+    }));
+
+    if (lobby.revealTimer) clearTimeout(lobby.revealTimer);
+  });
+});

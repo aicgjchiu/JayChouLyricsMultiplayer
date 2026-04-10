@@ -36,7 +36,7 @@ export class GameManager {
       hostSocketId: lobby.hostSocketId,
       settings: lobby.settings,
       maxPlayers: lobby.maxPlayers,
-      players: lobby.players.map(p => ({ nickname: p.nickname, score: p.score, socketId: p.socketId })),
+      players: lobby.players.map(p => ({ nickname: p.nickname, score: p.score })),
     };
   }
 
@@ -51,7 +51,7 @@ export class GameManager {
       isPrivate: Boolean(isPrivate),
       password: password || null,
       maxPlayers: 8,
-      settings: { numQuestions: numQuestions || 10, timeLimit: timeLimit || 30 },
+      settings: { numQuestions: Math.min(numQuestions || 10, allQuestions.length), timeLimit: timeLimit || 30 },
       players: [{ socketId, nickname, score: 0 }],
       state: 'waiting',
       questions: [],
@@ -108,6 +108,15 @@ export class GameManager {
         if (lobby.timerHandle) { clearInterval(lobby.timerHandle); lobby.timerHandle = null; }
         this._endQuestion(lobby, io);
       }
+    } else if (lobby.state === 'reveal') {
+      if (lobby.players.length === 0) {
+        if (lobby.revealTimer) { clearTimeout(lobby.revealTimer); lobby.revealTimer = null; }
+        this.lobbies.delete(lobby.id);
+        return;
+      }
+      io.to(lobby.id).emit('lobby-updated', this.lobbyPayload(lobby));
+    } else if (lobby.state === 'finished') {
+      io.to(lobby.id).emit('lobby-updated', this.lobbyPayload(lobby));
     }
   }
 
