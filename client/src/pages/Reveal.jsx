@@ -1,25 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
+import socket from '../socket.js';
 
-export default function Reveal({ revealData }) {
-  const [countdown, setCountdown] = useState(5);
-
-  useEffect(() => {
-    setCountdown(5);
-    const interval = setInterval(() => {
-      setCountdown(prev => {
-        if (prev <= 1) { clearInterval(interval); return 0; }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [revealData]);
-
+export default function Reveal({ revealData, lobby }) {
   if (!revealData) return null;
+
+  const isHost = lobby?.hostSocketId === socket.id;
 
   return (
     <div style={{ maxWidth: 600, margin: '0 auto', padding: 24 }}>
-      <h2 style={{ marginBottom: 4 }}>本題結果</h2>
-      <p style={{ color: '#888', marginBottom: 16 }}>下一題將在 {countdown} 秒後開始...</p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <h2 style={{ margin: 0 }}>本題結果</h2>
+        {isHost ? (
+          <button
+            onClick={() => socket.emit('next-question')}
+            style={{ padding: '8px 20px', fontSize: 15, background: '#3b82f6', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
+            下一題 ▶
+          </button>
+        ) : (
+          <p style={{ margin: 0, color: '#888', fontSize: 14 }}>等待房主繼續...</p>
+        )}
+      </div>
 
       <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8, padding: '10px 16px', marginBottom: 20 }}>
         <p style={{ margin: '0 0 4px', fontSize: 13, color: '#16a34a' }}>正確答案</p>
