@@ -52,6 +52,8 @@ io.on('connection', (socket) => {
   });
 
   socket.on('submit-answer', (data) => manager.submitAnswer(socket.id, data, io));
+  socket.on('update-draft', ({ answer }) => manager.updateDraft(socket.id, answer));
+  socket.on('next-question', () => manager.nextQuestion(socket.id, io));
 
   socket.on('restart-lobby', () => {
     manager.restartLobby(socket.id, io);
