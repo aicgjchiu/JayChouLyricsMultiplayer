@@ -26,10 +26,6 @@ export default function Lobby({ nickname, lobby, goToMenu }) {
         <button onClick={goToMenu} style={{ padding: '6px 14px' }}>離開</button>
       </div>
 
-      <div style={{ background: '#f5f5f5', borderRadius: 8, padding: '8px 16px', marginBottom: 20, fontFamily: 'monospace', fontSize: 22, letterSpacing: 6, textAlign: 'center' }}>
-        邀請碼：{lobby.code}
-      </div>
-
       {errorMsg && <p style={{ color: 'red' }}>{errorMsg}</p>}
 
       <div style={{ display: 'flex', gap: 16 }}>
