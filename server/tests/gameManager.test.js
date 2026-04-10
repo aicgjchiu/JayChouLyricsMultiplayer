@@ -114,14 +114,27 @@ describe('GameManager.leaveLobby', () => {
   });
 });
 
-describe('GameManager.getPublicLobbies', () => {
-  it('returns only public waiting lobbies', () => {
+describe('GameManager.getLobbies', () => {
+  it('returns all waiting lobbies (public and private) with isPrivate field', () => {
     const mgr = new GameManager();
     mgr.createLobby('h1', { nickname: 'H1', lobbyName: 'Public', numQuestions: 5, timeLimit: 30, isPrivate: false, password: null });
     mgr.createLobby('h2', { nickname: 'H2', lobbyName: 'Private', numQuestions: 5, timeLimit: 30, isPrivate: true, password: 'pw' });
-    const list = mgr.getPublicLobbies();
+    const list = mgr.getLobbies();
+    expect(list).toHaveLength(2);
+    const pub = list.find(l => l.name === 'Public');
+    const priv = list.find(l => l.name === 'Private');
+    expect(pub.isPrivate).toBe(false);
+    expect(priv.isPrivate).toBe(true);
+  });
+
+  it('excludes lobbies that are in_question or finished', () => {
+    const mgr = new GameManager();
+    mgr.createLobby('h1', { nickname: 'H1', lobbyName: 'Waiting', numQuestions: 5, timeLimit: 30, isPrivate: false, password: null });
+    const inProg = mgr.createLobby('h2', { nickname: 'H2', lobbyName: 'InProgress', numQuestions: 5, timeLimit: 30, isPrivate: false, password: null });
+    inProg.state = 'in_question';
+    const list = mgr.getLobbies();
     expect(list).toHaveLength(1);
-    expect(list[0].name).toBe('Public');
+    expect(list[0].name).toBe('Waiting');
   });
 });
 

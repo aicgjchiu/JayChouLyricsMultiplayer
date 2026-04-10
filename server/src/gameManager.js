@@ -23,10 +23,16 @@ export class GameManager {
     return code ? this.lobbies.get(code) : null;
   }
 
-  getPublicLobbies() {
+  getLobbies() {
     return [...this.lobbies.values()]
-      .filter(l => !l.isPrivate && l.state === 'waiting')
-      .map(l => ({ code: l.id, name: l.name, playerCount: l.players.length, maxPlayers: l.maxPlayers }));
+      .filter(l => l.state === 'waiting')
+      .map(l => ({
+        code: l.id,
+        name: l.name,
+        playerCount: l.players.length,
+        maxPlayers: l.maxPlayers,
+        isPrivate: l.isPrivate,
+      }));
   }
 
   lobbyPayload(lobby) {
