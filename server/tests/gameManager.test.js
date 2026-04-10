@@ -283,6 +283,7 @@ describe('GameManager.updateDraft', () => {
     mgr.updateDraft('p2', '草稿覆蓋');
 
     expect(lobby.currentAnswers.get('p2').answer).toBe('正式提交');
+    expect(lobby.playerDrafts.has('p2')).toBe(false);
 
     if (lobby.timerHandle) clearInterval(lobby.timerHandle);
     if (lobby.revealTimer) clearTimeout(lobby.revealTimer);

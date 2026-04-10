@@ -153,6 +153,7 @@ export class GameManager {
     lobby.questions = [];
     lobby.currentQuestionIndex = 0;
     lobby.currentAnswers = new Map();
+    lobby.playerDrafts = new Map();
     lobby.players.forEach(p => { p.score = 0; });
 
     io.to(lobby.id).emit('lobby-updated', this.lobbyPayload(lobby));
