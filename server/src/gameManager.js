@@ -36,7 +36,7 @@ export class GameManager {
       hostSocketId: lobby.hostSocketId,
       settings: lobby.settings,
       maxPlayers: lobby.maxPlayers,
-      players: lobby.players.map(p => ({ nickname: p.nickname, score: p.score })),
+      players: lobby.players.map(p => ({ nickname: p.nickname, score: p.score, isHost: p.socketId === lobby.hostSocketId })),
     };
   }
 
@@ -148,6 +148,14 @@ export class GameManager {
     lobby.currentAnswers = new Map();
     lobby.players.forEach(p => { p.score = 0; });
 
+    io.to(lobby.id).emit('lobby-updated', this.lobbyPayload(lobby));
+  }
+
+  updateSettings(socketId, { numQuestions, timeLimit }, io) {
+    const lobby = this.getLobby(socketId);
+    if (!lobby || lobby.hostSocketId !== socketId || lobby.state !== 'waiting') return;
+    if (numQuestions) lobby.settings.numQuestions = numQuestions;
+    if (timeLimit) lobby.settings.timeLimit = timeLimit;
     io.to(lobby.id).emit('lobby-updated', this.lobbyPayload(lobby));
   }
 
