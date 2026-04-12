@@ -142,8 +142,8 @@ export default function TelephoneResults({ results, lobby, finalData, goToMenu, 
         </div>
       )}
 
-      {/* === FREE-PLAY VIEW === */}
-      {inFreeplay && (
+      {/* === FREE-PLAY VIEW (per-song, hidden when game over since full recap takes over) === */}
+      {inFreeplay && !isGameOver && (
         <>
           {/* YouTube original */}
           <div style={{ background: '#f0f9ff', border: '1px solid #93c5fd', borderRadius: 8, padding: '12px 16px', marginBottom: 12 }}>
