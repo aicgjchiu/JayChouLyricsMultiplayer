@@ -23,11 +23,14 @@ function onApiReady(cb) {
   loadYouTubeApi();
 }
 
-export default function YouTubePlayer({ youtubeId, startTime, endTime, disabled }) {
+export default function YouTubePlayer({ youtubeId, startTime, endTime, disabled, onEnded, autoPlay }) {
   const containerRef = useRef(null);
   const playerRef = useRef(null);
   const intervalRef = useRef(null);
+  const onEndedRef = useRef(onEnded);
   const [ready, setReady] = useState(false);
+
+  useEffect(() => { onEndedRef.current = onEnded; }, [onEnded]);
 
   function stopEndTimeMonitor() {
     if (intervalRef.current) {
@@ -44,6 +47,7 @@ export default function YouTubePlayer({ youtubeId, startTime, endTime, disabled 
       if (p.getCurrentTime() >= endTime) {
         p.pauseVideo();
         stopEndTimeMonitor();
+        if (onEndedRef.current) onEndedRef.current();
       }
     }, 250);
   }
@@ -57,7 +61,12 @@ export default function YouTubePlayer({ youtubeId, startTime, endTime, disabled 
         videoId: youtubeId,
         playerVars: { start: Math.floor(startTime), end: Math.ceil(endTime), controls: 0, modestbranding: 1 },
         events: {
-          onReady: () => setReady(true),
+          onReady: () => {
+            setReady(true);
+            if (autoPlay && playerRef.current) {
+              playerRef.current.playVideo();
+            }
+          },
           onStateChange: (e) => {
             if (e.data === window.YT.PlayerState.PLAYING) {
               startEndTimeMonitor();
