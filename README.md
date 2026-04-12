@@ -1,6 +1,6 @@
 # JayChouLyricsMultiplayer
 
-A real-time multiplayer web game featuring Jay Chou (周杰倫) songs with two game modes.
+A real-time multiplayer web game with two music game modes, featuring Jay Chou (周杰倫) and other popular Chinese/English songs.
 
 **Play now:** https://jay-chou-lyrics-game.fly.dev/
 
@@ -19,13 +19,14 @@ Listen to audio clips of Jay Chou songs and type the correct lyrics. Players are
 
 A party game inspired by the telephone game, but with music:
 
-1. Each player listens to a YouTube clip of a Jay Chou song
+1. Each player listens to a YouTube clip of a song
 2. Players record themselves singing **different lyrics** using the melody they heard
 3. Recordings are passed to the next player, who sings new lyrics to the melody they hear
 4. After N-1 rounds of singing, the last player guesses which song it was
 5. Everyone watches the chain playback to see how the melody degraded
 
 - 3-8 players
+- 21 songs including Jay Chou hits and popular Chinese/English songs
 - Configurable phase duration: 60/90/120 seconds
 - No scoring — the fun is in the degradation and the guesses
 
@@ -94,8 +95,8 @@ cd server && node src/index.js
 To add new songs or lyrics, edit the JSON files directly:
 
 - **`questions.json`** — Lyrics-guess questions (song, hint, audio path, answer)
-- **`songs.json`** — Songs for telephone mode (name, YouTube video ID, start/end timestamps)
-- **`lyrics.json`** — Lyric phrases for telephone mode (text + source songName for mismatch filtering)
+- **`songs.json`** — 21 songs for telephone mode (name, YouTube video ID, start/end timestamps)
+- **`lyrics.json`** — 23 lyric phrases for telephone mode (text + source songName for mismatch filtering)
 
 ## Deployment
 

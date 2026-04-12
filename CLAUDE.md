@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-A real-time multiplayer web game featuring Jay Chou (周杰倫) songs with two game modes:
+A real-time multiplayer web game with two music game modes, featuring Jay Chou (周杰倫) and other popular Chinese/English songs:
 
 1. **周杰倫猜歌 (Lyrics Guess)** — Players listen to audio clips and guess the lyrics. Scored by accuracy and speed.
 2. **音樂傳聲筒 (Musical Telephone)** — Players record themselves singing mismatched lyrics to melodies, pass recordings down a chain, and the last person guesses the song. No scoring — purely for entertainment.
@@ -70,8 +70,8 @@ fly deploy
 | File | Description |
 |------|-------------|
 | `questions.json` | 72 lyrics-guess questions with song, hint, audio path, answer |
-| `songs.json` | 13 songs with YouTube video IDs and timestamp segments (telephone mode) |
-| `lyrics.json` | 16 singable lyric phrases with source `songName` for mismatch filtering |
+| `songs.json` | 21 songs with YouTube video IDs and timestamp segments (telephone mode) |
+| `lyrics.json` | 23 singable lyric phrases with source `songName` for mismatch filtering |
 | `audio/` | MP3 clips for lyrics-guess mode |
 
 ## Key Patterns
@@ -91,4 +91,10 @@ fly deploy
 
 ## Songs Included
 
-太陽之子, 西西里, 那天下雨了, 湘女多情, 誰稀罕, 七月的極光, 愛琴海, I Do, 聖徒, 女兒殿下, 淘金小鎮, 鄉間的路, 聖誕星 (13 songs)
+### Telephone Mode (songs.json — 21 songs)
+
+青花瓷, 稻香, 晴天, 我難過, 孤勇者, 童話, 我們的愛, 曹操, Never gonna give you up, 小情歌, 那些年, 突然好想你, 你是我的花朵, 超跑情人夢, 露比醬, 快樂崇拜, 泡沫, 修練愛情, 洋蔥, 大海, 隱形的翅膀
+
+### Lyrics Guess Mode (audio/ — 72 clips from 13 songs)
+
+太陽之子, 西西里, 那天下雨了, 湘女多情, 誰稀罕, 七月的極光, 愛琴海, I Do, 聖徒, 女兒殿下, 淘金小鎮, 鄉間的路, 聖誕星
