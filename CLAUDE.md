@@ -44,7 +44,7 @@ fly deploy
 | `server/src/index.js` | Express server, Socket.IO handlers, HTTP endpoints, static file serving |
 | `server/src/gameManager.js` | Shared lobby lifecycle (create, join, leave, settings). Dispatches to mode modules. |
 | `server/src/modes/lyricsGuess.js` | Lyrics-guess game logic: questions, scoring, timers |
-| `server/src/modes/telephone.js` | Telephone mode: phase management, recording storage, guess collection, results |
+| `server/src/modes/telephone.js` | Telephone mode: phase management, recording storage, guess collection, step-by-step results review |
 | `server/src/rotation.js` | Pure function `buildAssignments(N)` — Latin square rotation for telephone mode |
 | `server/src/scoring.js` | `calculateScore()` and `normalizeText()` for lyrics-guess mode |
 
@@ -56,14 +56,14 @@ fly deploy
 | `client/src/socket.js` | Shared Socket.IO client instance |
 | `client/src/hooks/useSocket.js` | `useSocketEvent` hook for declarative socket listeners |
 | `client/src/pages/MainMenu.jsx` | Mode selector, lobby creation, lobby list |
-| `client/src/pages/Lobby.jsx` | Player list, mode-aware settings, start button |
+| `client/src/pages/Lobby.jsx` | Player list, mode-aware settings, start button, mic test (telephone only) |
 | `client/src/pages/Game.jsx` | Lyrics-guess: audio playback, answer input, draft emission |
 | `client/src/pages/Reveal.jsx` | Lyrics-guess: per-question results, host next-question button |
 | `client/src/pages/Results.jsx` | Lyrics-guess: final scores with medals |
 | `client/src/pages/TelephonePhase.jsx` | Telephone: listen/record/preview/submit flow |
 | `client/src/pages/TelephoneGuess.jsx` | Telephone: guess the song name |
-| `client/src/pages/TelephoneResults.jsx` | Telephone: chain playback, host advance, game over |
-| `client/src/components/YouTubePlayer.jsx` | YouTube IFrame API wrapper (lazy-loads API) |
+| `client/src/pages/TelephoneResults.jsx` | Telephone: host-controlled step-by-step review, per-song free-play, full game-over recap |
+| `client/src/components/YouTubePlayer.jsx` | YouTube IFrame API wrapper (lazy-loads API, supports autoPlay/onEnded, enforces endTime on replay) |
 
 ### Data Files
 
@@ -87,6 +87,10 @@ fly deploy
 - **Rotation algorithm:** `buildAssignments(N)` ensures each player sings every song exactly once, sees different lyrics each phase, and guesses a song they never sang in. Uses a formula for odd N, backtracking for even N.
 - **Lyrics mismatch filtering:** When songs are selected, lyrics whose `songName` matches any selected song are excluded from the pool.
 - **Recording flow:** Audio disabled permanently once recording starts. Players can preview and re-record, but cannot re-listen to the source audio.
+- **YouTube replay fix:** The IFrame API's `start`/`end` playerVars only apply on first play. A 250ms interval monitors `getCurrentTime()` and pauses at `endTime` for all replays. Hint text tells players to use the replay button.
+- **Results review:** Host-controlled step-by-step advancement via `advance-review` socket event. Steps: YouTube original → each recording → answer reveal → free-play. Server tracks `currentReviewStep` per song.
+- **Game-over recap:** Shows all songs with full free-play controls (YouTube, all recordings, answers) on a single scrollable page.
+- **Mic test in lobby:** Telephone mode only. Players can record/playback to verify mic before game starts.
 - **Minimum 3 players** for telephone mode (2 for lyrics-guess).
 
 ## Songs Included

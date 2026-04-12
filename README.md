@@ -28,6 +28,9 @@ A party game inspired by the telephone game, but with music:
 - 3-8 players
 - 21 songs including Jay Chou hits and popular Chinese/English songs
 - Configurable phase duration: 60/90/120 seconds
+- Microphone test in lobby before game starts
+- Host-controlled step-by-step results review (original → each recording → answer reveal → free-play)
+- Full game-over recap with all songs and recordings
 - No scoring — the fun is in the degradation and the guesses
 
 ## How to Play
