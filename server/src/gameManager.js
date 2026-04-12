@@ -236,6 +236,12 @@ export class GameManager {
     telephoneMode.nextSong(lobby, socketId, io);
   }
 
+  advanceReview(socketId, io) {
+    const lobby = this.getLobby(socketId);
+    if (!lobby) return;
+    telephoneMode.advanceReview(lobby, socketId, io);
+  }
+
   wantRematch(socketId, io) {
     const lobby = this.getLobby(socketId);
     if (!lobby || lobby.state !== 'finished') return;

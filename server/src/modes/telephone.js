@@ -93,6 +93,7 @@ export function nextSong(lobby, socketId, io) {
 
   const tel = lobby.telephone;
   tel.currentResultSong++;
+  tel.currentReviewStep = 0;
 
   if (tel.currentResultSong >= tel.songs.length) {
     lobby.state = 'finished';
@@ -100,6 +101,7 @@ export function nextSong(lobby, socketId, io) {
   } else {
     io.to(lobby.id).emit('telephone-next-song', {
       songIndex: tel.currentResultSong,
+      reviewStep: 0,
     });
   }
 }
@@ -203,10 +205,30 @@ function _startGuess(lobby, io) {
   }, 1000);
 }
 
+export function advanceReview(lobby, socketId, io) {
+  if (lobby.state !== 'telephone_results') return;
+  if (lobby.hostSocketId !== socketId) return;
+
+  const tel = lobby.telephone;
+  const song = tel.resultsData[tel.currentResultSong];
+  // Total steps: 0=youtube, 1..chain.length=recordings, chain.length+1=reveal, chain.length+2=freeplay
+  const maxStep = song.chain.length + 2;
+
+  tel.currentReviewStep++;
+
+  if (tel.currentReviewStep > maxStep) return;
+
+  io.to(lobby.id).emit('telephone-review-step', {
+    songIndex: tel.currentResultSong,
+    step: tel.currentReviewStep,
+  });
+}
+
 function _startResults(lobby, io) {
   lobby.state = 'telephone_results';
   const tel = lobby.telephone;
   tel.currentResultSong = 0;
+  tel.currentReviewStep = 0; // starts at youtube (step 0)
 
   const results = tel.songs.map((song, songIdx) => {
     const chain = [];
@@ -234,7 +256,9 @@ function _startResults(lobby, io) {
     };
   });
 
-  io.to(lobby.id).emit('telephone-results-start', { results });
+  tel.resultsData = results;
+
+  io.to(lobby.id).emit('telephone-results-start', { results, reviewStep: 0 });
 }
 
 function _findFallbackAudio(tel, songIdx, targetPhase, lobbyId) {

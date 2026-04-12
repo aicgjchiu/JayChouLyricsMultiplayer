@@ -71,12 +71,16 @@ export default function App() {
   }, []));
 
   useSocketEvent('telephone-results-start', useCallback((data) => {
-    setPhoneResults(data);
+    setPhoneResults({ ...data, currentSongIndex: 0, reviewStep: data.reviewStep || 0 });
     setPage('telephone-results');
   }, []));
 
-  useSocketEvent('telephone-next-song', useCallback(({ songIndex }) => {
-    setPhoneResults(prev => prev ? { ...prev, currentSongIndex: songIndex } : prev);
+  useSocketEvent('telephone-next-song', useCallback(({ songIndex, reviewStep }) => {
+    setPhoneResults(prev => prev ? { ...prev, currentSongIndex: songIndex, reviewStep: reviewStep || 0 } : prev);
+  }, []));
+
+  useSocketEvent('telephone-review-step', useCallback(({ songIndex, step }) => {
+    setPhoneResults(prev => prev ? { ...prev, currentSongIndex: songIndex, reviewStep: step } : prev);
   }, []));
 
   useSocketEvent('game-over', useCallback((data) => {

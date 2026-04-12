@@ -1,77 +1,48 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import socket from '../socket.js';
 import YouTubePlayer from '../components/YouTubePlayer.jsx';
 
 export default function TelephoneResults({ results, lobby, finalData, goToMenu, goToLobby, rematchPlayers, hostWantsRematch, votedRematch, onWantRematch, onJoinRematch }) {
-  const [currentSong, setCurrentSong] = useState(0);
-  // Auto-play stages: 'youtube' -> 'chain' -> 'reveal' -> 'freeplay'
-  const [autoStage, setAutoStage] = useState('youtube');
-  const [activeChainIdx, setActiveChainIdx] = useState(-1);
   const chainAudioRef = useRef(null);
 
   const isHost = lobby?.hostSocketId === socket.id;
   const isGameOver = !!finalData;
 
-  // Reset auto-play when song changes
-  useEffect(() => {
-    if (results?.currentSongIndex !== undefined) {
-      setCurrentSong(results.currentSongIndex);
-      setAutoStage('youtube');
-      setActiveChainIdx(-1);
-    }
-  }, [results?.currentSongIndex]);
-
   if (!results || !results.results) return null;
 
   const songs = results.results;
+  const currentSong = results.currentSongIndex || 0;
   const song = songs[currentSong];
   if (!song) return null;
 
   const chain = song.chain;
+  const step = results.reviewStep || 0;
 
-  // YouTube finished -> start chain auto-play
-  function handleYoutubeEnded() {
-    if (autoStage !== 'youtube') return;
-    if (chain.length > 0 && chain[0].audioUrl) {
-      setAutoStage('chain');
-      setActiveChainIdx(0);
-    } else {
-      // No recordings, skip to reveal
-      setAutoStage('reveal');
-      setTimeout(() => setAutoStage('freeplay'), 3000);
+  // Steps: 0=youtube, 1..chain.length=recordings, chain.length+1=reveal, chain.length+2=freeplay
+  const revealStep = chain.length + 1;
+  const freeplayStep = chain.length + 2;
+  const inFreeplay = step >= freeplayStep;
+  const inReview = !inFreeplay;
+
+  function handleAdvance() {
+    if (step < freeplayStep) {
+      socket.emit('advance-review');
     }
   }
 
-  // Chain audio ended -> play next or move to reveal
-  function handleChainAudioEnded() {
-    const nextIdx = activeChainIdx + 1;
-    if (nextIdx < chain.length && chain[nextIdx].audioUrl) {
-      setActiveChainIdx(nextIdx);
-    } else {
-      setAutoStage('reveal');
-      setTimeout(() => setAutoStage('freeplay'), 3000);
-    }
-  }
-
-  // Play current chain entry when activeChainIdx changes
+  // Auto-play chain audio when step lands on a recording
   useEffect(() => {
-    if (autoStage === 'chain' && activeChainIdx >= 0) {
-      // Small delay so the new audio element mounts
+    if (step >= 1 && step <= chain.length) {
       const t = setTimeout(() => {
         if (chainAudioRef.current) {
           chainAudioRef.current.play().catch(() => {});
         }
-      }, 400);
+      }, 300);
       return () => clearTimeout(t);
     }
-  }, [autoStage, activeChainIdx]);
+  }, [step, currentSong]);
 
-  const inAutoPlay = autoStage !== 'freeplay';
-  const currentLabel = autoStage === 'youtube'
-    ? song.songName
-    : autoStage === 'chain' && activeChainIdx >= 0
-      ? chain[activeChainIdx]?.nickname
-      : null;
+  const chainIdx = step - 1; // which chain entry is active (0-based)
 
   return (
     <div style={{ maxWidth: 600, margin: '0 auto', padding: 24 }}>
@@ -79,13 +50,13 @@ export default function TelephoneResults({ results, lobby, finalData, goToMenu, 
         <h2 style={{ margin: 0 }}>結果回顧 — 歌曲 {currentSong + 1}/{songs.length}</h2>
       </div>
 
-      {/* === AUTO-PLAY VIEW === */}
-      {inAutoPlay && (
+      {/* === STEP-BY-STEP REVIEW === */}
+      {inReview && (
         <div style={{ textAlign: 'center' }}>
-          {/* Now playing label */}
-          {autoStage === 'youtube' && (
+          {/* Step 0: YouTube original */}
+          {step === 0 && (
             <div style={{ background: '#f0f9ff', border: '2px solid #3b82f6', borderRadius: 12, padding: 20, marginBottom: 16 }}>
-              <p style={{ margin: '0 0 4px', fontSize: 13, color: '#3b82f6' }}>正在播放原曲</p>
+              <p style={{ margin: '0 0 4px', fontSize: 13, color: '#3b82f6' }}>原曲</p>
               <p style={{ margin: '0 0 12px', fontSize: 24, fontWeight: 700 }}>{song.songName}</p>
               <YouTubePlayer
                 youtubeId={song.youtube.youtubeId}
@@ -93,38 +64,40 @@ export default function TelephoneResults({ results, lobby, finalData, goToMenu, 
                 endTime={song.youtube.endTime}
                 disabled={false}
                 autoPlay
-                onEnded={handleYoutubeEnded}
               />
             </div>
           )}
 
-          {autoStage === 'chain' && activeChainIdx >= 0 && (
+          {/* Steps 1..chain.length: Recordings */}
+          {step >= 1 && step <= chain.length && (
             <div style={{ background: '#fef9c3', border: '2px solid #f59e0b', borderRadius: 12, padding: 20, marginBottom: 16 }}>
               <p style={{ margin: '0 0 4px', fontSize: 13, color: '#b45309' }}>
-                第 {chain[activeChainIdx].phaseIndex + 1} 回合
+                第 {chain[chainIdx].phaseIndex + 1} 回合
               </p>
               <p style={{ margin: '0 0 4px', fontSize: 24, fontWeight: 700 }}>
-                {chain[activeChainIdx].nickname}
+                {chain[chainIdx].nickname}
               </p>
               <p style={{ margin: '0 0 12px', fontSize: 15, color: '#666' }}>
-                歌詞: {chain[activeChainIdx].lyrics}
+                歌詞: {chain[chainIdx].lyrics}
               </p>
-              <audio
-                ref={chainAudioRef}
-                key={`auto-${currentSong}-${activeChainIdx}`}
-                src={chain[activeChainIdx].audioUrl}
-                preload="auto"
-                onEnded={handleChainAudioEnded}
-              />
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                <span style={{ display: 'inline-block', width: 12, height: 12, background: '#ef4444', borderRadius: '50%', animation: 'pulse 1s infinite' }} />
-                <span style={{ fontSize: 15, color: '#888' }}>播放中...</span>
-              </div>
+              {chain[chainIdx].audioUrl ? (
+                <audio
+                  ref={chainAudioRef}
+                  key={`review-${currentSong}-${chainIdx}`}
+                  src={chain[chainIdx].audioUrl}
+                  preload="auto"
+                  controls
+                  style={{ width: '100%', maxWidth: 400 }}
+                />
+              ) : (
+                <p style={{ color: '#bbb', fontStyle: 'italic' }}>（未錄音）</p>
+              )}
             </div>
           )}
 
-          {autoStage === 'reveal' && (
-            <div style={{ background: '#f0fdf4', border: '2px solid #22c55e', borderRadius: 12, padding: 20, marginBottom: 16, animation: 'fadeIn 0.5s' }}>
+          {/* Reveal step */}
+          {step === revealStep && (
+            <div style={{ background: '#f0fdf4', border: '2px solid #22c55e', borderRadius: 12, padding: 20, marginBottom: 16 }}>
               <p style={{ margin: '0 0 4px', fontSize: 13, color: '#16a34a' }}>{song.guesserNickname} 猜的答案</p>
               <p style={{ margin: '0 0 12px', fontSize: 28, fontWeight: 700 }}>{song.guess}</p>
               <p style={{ margin: '0 0 4px', fontSize: 13, color: '#888' }}>正確答案</p>
@@ -135,25 +108,42 @@ export default function TelephoneResults({ results, lobby, finalData, goToMenu, 
           )}
 
           {/* Progress dots */}
-          <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginTop: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginTop: 12, marginBottom: 16 }}>
             {/* YouTube dot */}
             <span style={{
               width: 10, height: 10, borderRadius: '50%',
-              background: autoStage === 'youtube' ? '#3b82f6' : '#d1d5db',
+              background: step === 0 ? '#3b82f6' : '#d1d5db',
             }} />
+            {/* Chain dots */}
             {chain.map((_, i) => (
               <span key={i} style={{
                 width: 10, height: 10, borderRadius: '50%',
-                background: autoStage === 'chain' && i === activeChainIdx ? '#f59e0b'
-                  : (autoStage === 'chain' && i < activeChainIdx) || autoStage === 'reveal' || autoStage === 'freeplay' ? '#d1d5db' : '#e5e7eb',
+                background: step === i + 1 ? '#f59e0b' : step > i + 1 ? '#d1d5db' : '#e5e7eb',
               }} />
             ))}
+            {/* Reveal dot */}
+            <span style={{
+              width: 10, height: 10, borderRadius: '50%',
+              background: step === revealStep ? '#22c55e' : '#e5e7eb',
+            }} />
           </div>
+
+          {/* Host advance button */}
+          {isHost && (
+            <button
+              onClick={handleAdvance}
+              style={{ padding: '10px 28px', fontSize: 16, background: '#3b82f6', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
+              下一步 ▶
+            </button>
+          )}
+          {!isHost && (
+            <p style={{ color: '#888', fontSize: 14 }}>等待房主繼續...</p>
+          )}
         </div>
       )}
 
-      {/* === FREE-PLAY VIEW (after auto-play completes) === */}
-      {!inAutoPlay && (
+      {/* === FREE-PLAY VIEW === */}
+      {inFreeplay && (
         <>
           {/* YouTube original */}
           <div style={{ background: '#f0f9ff', border: '1px solid #93c5fd', borderRadius: 8, padding: '12px 16px', marginBottom: 12 }}>
@@ -209,7 +199,7 @@ export default function TelephoneResults({ results, lobby, finalData, goToMenu, 
         </>
       )}
 
-      {isGameOver && !inAutoPlay && (
+      {isGameOver && inFreeplay && (
         <div style={{ textAlign: 'center' }}>
           <h2>🎉 遊戲結束</h2>
 
