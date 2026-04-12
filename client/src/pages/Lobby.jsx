@@ -1,9 +1,44 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import socket from '../socket.js';
 import { useSocketEvent } from '../hooks/useSocket.js';
 
 export default function Lobby({ nickname, lobby, goToMenu }) {
   const [errorMsg, setErrorMsg] = useState('');
+  const [micState, setMicState] = useState('idle'); // 'idle' | 'recording' | 'recorded'
+  const [micUrl, setMicUrl] = useState(null);
+  const micRecorderRef = useRef(null);
+  const micStreamRef = useRef(null);
+  const micChunksRef = useRef([]);
+
+  async function handleMicStart() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      micStreamRef.current = stream;
+      micChunksRef.current = [];
+      const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) micChunksRef.current.push(e.data); };
+      recorder.onstop = () => {
+        const blob = new Blob(micChunksRef.current, { type: 'audio/webm' });
+        if (micUrl) URL.revokeObjectURL(micUrl);
+        setMicUrl(URL.createObjectURL(blob));
+        setMicState('recorded');
+      };
+      micRecorderRef.current = recorder;
+      recorder.start();
+      setMicState('recording');
+    } catch (err) {
+      alert('無法存取麥克風: ' + err.message);
+    }
+  }
+
+  function handleMicStop() {
+    if (micRecorderRef.current && micRecorderRef.current.state === 'recording') {
+      micRecorderRef.current.stop();
+    }
+    if (micStreamRef.current) {
+      micStreamRef.current.getTracks().forEach(t => t.stop());
+    }
+  }
 
   const isHost = lobby?.hostSocketId === socket.id;
   const isTelephone = lobby?.settings?.gameMode === 'telephone';
@@ -112,6 +147,37 @@ export default function Lobby({ nickname, lobby, goToMenu }) {
       {!isHost && (
         <p style={{ textAlign: 'center', color: '#888', marginTop: 20 }}>等待房主開始遊戲...</p>
       )}
+
+      <div style={{ marginTop: 24, border: '1px solid #ddd', borderRadius: 8, padding: 16 }}>
+        <h4 style={{ margin: '0 0 12px' }}>🎤 麥克風測試</h4>
+        <p style={{ margin: '0 0 12px', fontSize: 13, color: '#666' }}>
+          在遊戲開始前測試你的麥克風，確認錄音和播放正常。
+        </p>
+        {micState === 'idle' && (
+          <button onClick={handleMicStart}
+            style={{ padding: '8px 20px', fontSize: 14, background: '#ef4444', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
+            🎙️ 開始錄音測試
+          </button>
+        )}
+        {micState === 'recording' && (
+          <div>
+            <p style={{ color: '#ef4444', fontWeight: 600, margin: '0 0 8px' }}>🔴 錄音中...</p>
+            <button onClick={handleMicStop}
+              style={{ padding: '8px 20px', fontSize: 14, background: '#333', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
+              ⏹ 停止錄音
+            </button>
+          </div>
+        )}
+        {micState === 'recorded' && micUrl && (
+          <div>
+            <audio src={micUrl} controls style={{ width: '100%', marginBottom: 8 }} />
+            <button onClick={() => { if (micUrl) URL.revokeObjectURL(micUrl); setMicUrl(null); setMicState('idle'); }}
+              style={{ padding: '6px 16px', fontSize: 13, background: '#6b7280', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
+              🔄 重新測試
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
