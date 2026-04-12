@@ -26,7 +26,27 @@ function onApiReady(cb) {
 export default function YouTubePlayer({ youtubeId, startTime, endTime, disabled }) {
   const containerRef = useRef(null);
   const playerRef = useRef(null);
+  const intervalRef = useRef(null);
   const [ready, setReady] = useState(false);
+
+  function stopEndTimeMonitor() {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  }
+
+  function startEndTimeMonitor() {
+    stopEndTimeMonitor();
+    intervalRef.current = setInterval(() => {
+      const p = playerRef.current;
+      if (!p || !p.getCurrentTime) return;
+      if (p.getCurrentTime() >= endTime) {
+        p.pauseVideo();
+        stopEndTimeMonitor();
+      }
+    }, 250);
+  }
 
   useEffect(() => {
     onApiReady(() => {
@@ -38,11 +58,19 @@ export default function YouTubePlayer({ youtubeId, startTime, endTime, disabled 
         playerVars: { start: Math.floor(startTime), end: Math.ceil(endTime), controls: 0, modestbranding: 1 },
         events: {
           onReady: () => setReady(true),
+          onStateChange: (e) => {
+            if (e.data === window.YT.PlayerState.PLAYING) {
+              startEndTimeMonitor();
+            } else {
+              stopEndTimeMonitor();
+            }
+          },
         },
       });
     });
 
     return () => {
+      stopEndTimeMonitor();
       if (playerRef.current && playerRef.current.destroy) {
         playerRef.current.destroy();
       }
@@ -58,6 +86,7 @@ export default function YouTubePlayer({ youtubeId, startTime, endTime, disabled 
 
   useEffect(() => {
     if (disabled && playerRef.current) {
+      stopEndTimeMonitor();
       playerRef.current.stopVideo();
     }
   }, [disabled]);
@@ -70,9 +99,14 @@ export default function YouTubePlayer({ youtubeId, startTime, endTime, disabled 
     <div style={{ textAlign: 'center' }}>
       <div ref={containerRef} />
       {ready && (
-        <button onClick={handlePlay} style={{ marginTop: 8, padding: '6px 16px', fontSize: 14 }}>
-          🔁 重播片段
-        </button>
+        <>
+          <button onClick={handlePlay} style={{ marginTop: 8, padding: '6px 16px', fontSize: 14 }}>
+            🔁 重播片段
+          </button>
+          <p style={{ margin: '6px 0 0', fontSize: 12, color: '#888' }}>
+            請使用上方按鈕重播，直接點影片可能無法播放正確片段
+          </p>
+        </>
       )}
     </div>
   );
