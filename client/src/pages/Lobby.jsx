@@ -148,7 +148,7 @@ export default function Lobby({ nickname, lobby, goToMenu }) {
         <p style={{ textAlign: 'center', color: '#888', marginTop: 20 }}>等待房主開始遊戲...</p>
       )}
 
-      <div style={{ marginTop: 24, border: '1px solid #ddd', borderRadius: 8, padding: 16 }}>
+      {isTelephone && <div style={{ marginTop: 24, border: '1px solid #ddd', borderRadius: 8, padding: 16 }}>
         <h4 style={{ margin: '0 0 12px' }}>🎤 麥克風測試</h4>
         <p style={{ margin: '0 0 12px', fontSize: 13, color: '#666' }}>
           在遊戲開始前測試你的麥克風，確認錄音和播放正常。
@@ -177,7 +177,7 @@ export default function Lobby({ nickname, lobby, goToMenu }) {
             </button>
           </div>
         )}
-      </div>
+      </div>}
     </div>
   );
 }

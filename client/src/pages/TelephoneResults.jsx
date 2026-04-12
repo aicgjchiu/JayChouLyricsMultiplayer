@@ -199,66 +199,110 @@ export default function TelephoneResults({ results, lobby, finalData, goToMenu, 
         </>
       )}
 
-      {isGameOver && inFreeplay && (
-        <div style={{ textAlign: 'center' }}>
-          <h2>🎉 遊戲結束</h2>
+      {isGameOver && (
+        <div>
+          <h2 style={{ textAlign: 'center' }}>🎉 遊戲結束 — 總回顧</h2>
 
-          {rematchPlayers?.length > 0 && !hostWantsRematch && (
-            <div style={{ margin: '0 0 16px', padding: '8px 16px', background: '#fef3c7', borderRadius: 8 }}>
-              {rematchPlayers.map(n => (
-                <span key={n} style={{ display: 'inline-block', margin: '4px 8px', fontSize: 14 }}>
-                  🔥 {n} 想再來一局
-                </span>
+          {songs.map((s, songIdx) => (
+            <div key={songIdx} style={{ marginBottom: 24, border: '2px solid #e5e7eb', borderRadius: 12, padding: 16 }}>
+              <h3 style={{ margin: '0 0 12px', borderBottom: '1px solid #e5e7eb', paddingBottom: 8 }}>
+                歌曲 {songIdx + 1} — {s.songName}
+              </h3>
+
+              {/* YouTube original */}
+              <div style={{ background: '#f0f9ff', border: '1px solid #93c5fd', borderRadius: 8, padding: '12px 16px', marginBottom: 8 }}>
+                <p style={{ margin: '0 0 8px', fontSize: 14, fontWeight: 600 }}>原曲 — {s.songName}</p>
+                <YouTubePlayer
+                  youtubeId={s.youtube.youtubeId}
+                  startTime={s.youtube.startTime}
+                  endTime={s.youtube.endTime}
+                  disabled={false}
+                />
+              </div>
+
+              {/* Recording chain */}
+              {s.chain.map((entry, idx) => (
+                <div key={idx} style={{
+                  background: '#f5f5f5', border: '1px solid #e5e5e5',
+                  borderRadius: 8, padding: '10px 16px', marginBottom: 6,
+                }}>
+                  <p style={{ margin: '0 0 4px', fontSize: 13, color: '#888' }}>
+                    第 {entry.phaseIndex + 1} 回合 — {entry.nickname}
+                  </p>
+                  <p style={{ margin: '0 0 8px', fontSize: 15, fontWeight: 500 }}>歌詞: {entry.lyrics}</p>
+                  {entry.audioUrl ? (
+                    <audio src={entry.audioUrl} preload="auto" style={{ width: '100%' }} controls />
+                  ) : (
+                    <p style={{ color: '#bbb', fontStyle: 'italic', margin: 0 }}>（未錄音）</p>
+                  )}
+                </div>
               ))}
-            </div>
-          )}
 
-          {hostWantsRematch && !isHost && (
-            <div style={{ margin: '0 0 16px', padding: '16px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8 }}>
-              <p style={{ margin: '0 0 12px', fontSize: 16, fontWeight: 600 }}>房主想再來一局！</p>
+              {/* Guess */}
+              <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8, padding: '10px 16px' }}>
+                <p style={{ margin: '0 0 4px', fontSize: 13, color: '#16a34a' }}>{s.guesserNickname} 猜的答案</p>
+                <p style={{ margin: '0 0 4px', fontSize: 18, fontWeight: 700 }}>{s.guess}</p>
+                <p style={{ margin: 0, fontSize: 14, color: s.guess === s.songName ? '#16a34a' : '#dc2626' }}>
+                  正確答案: {s.songName} {s.guess === s.songName ? '✓' : '✗'}
+                </p>
+              </div>
+            </div>
+          ))}
+
+          {/* Rematch / menu buttons */}
+          <div style={{ textAlign: 'center', marginTop: 16 }}>
+            {rematchPlayers?.length > 0 && !hostWantsRematch && (
+              <div style={{ margin: '0 0 16px', padding: '8px 16px', background: '#fef3c7', borderRadius: 8 }}>
+                {rematchPlayers.map(n => (
+                  <span key={n} style={{ display: 'inline-block', margin: '4px 8px', fontSize: 14 }}>
+                    🔥 {n} 想再來一局
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {hostWantsRematch && !isHost && (
+              <div style={{ margin: '0 0 16px', padding: '16px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8 }}>
+                <p style={{ margin: '0 0 12px', fontSize: 16, fontWeight: 600 }}>房主想再來一局！</p>
+                <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+                  <button onClick={onJoinRematch}
+                    style={{ padding: '10px 24px', fontSize: 15, background: '#22c55e', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
+                    加入
+                  </button>
+                  <button onClick={goToMenu}
+                    style={{ padding: '10px 24px', fontSize: 15, background: 'white', border: '2px solid #ddd', borderRadius: 8, cursor: 'pointer' }}>
+                    回主選單
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {!hostWantsRematch && (
               <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-                <button
-                  onClick={onJoinRematch}
-                  style={{ padding: '10px 24px', fontSize: 15, background: '#22c55e', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
-                  加入
-                </button>
-                <button
-                  onClick={goToMenu}
-                  style={{ padding: '10px 24px', fontSize: 15, background: 'white', border: '2px solid #ddd', borderRadius: 8, cursor: 'pointer' }}>
+                {isHost && (
+                  <button onClick={() => goToLobby(true)}
+                    style={{ padding: '12px 24px', fontSize: 16, background: '#22c55e', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
+                    再玩一次
+                  </button>
+                )}
+                {!isHost && !votedRematch && (
+                  <button onClick={onWantRematch}
+                    style={{ padding: '12px 24px', fontSize: 16, background: '#f59e0b', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
+                    🔥 再來一局
+                  </button>
+                )}
+                {!isHost && votedRematch && (
+                  <span style={{ padding: '12px 24px', fontSize: 15, color: '#16a34a', fontWeight: 600 }}>
+                    已表示再來一局 ✓
+                  </span>
+                )}
+                <button onClick={goToMenu}
+                  style={{ padding: '12px 24px', fontSize: 16, background: 'white', border: '2px solid #ddd', borderRadius: 8, cursor: 'pointer' }}>
                   回主選單
                 </button>
               </div>
-            </div>
-          )}
-
-          {!hostWantsRematch && (
-            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-              {isHost && (
-                <button
-                  onClick={() => goToLobby(true)}
-                  style={{ padding: '12px 24px', fontSize: 16, background: '#22c55e', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
-                  再玩一次
-                </button>
-              )}
-              {!isHost && !votedRematch && (
-                <button
-                  onClick={onWantRematch}
-                  style={{ padding: '12px 24px', fontSize: 16, background: '#f59e0b', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
-                  🔥 再來一局
-                </button>
-              )}
-              {!isHost && votedRematch && (
-                <span style={{ padding: '12px 24px', fontSize: 15, color: '#16a34a', fontWeight: 600 }}>
-                  已表示再來一局 ✓
-                </span>
-              )}
-              <button
-                onClick={goToMenu}
-                style={{ padding: '12px 24px', fontSize: 16, background: 'white', border: '2px solid #ddd', borderRadius: 8, cursor: 'pointer' }}>
-                回主選單
-              </button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       )}
     </div>
