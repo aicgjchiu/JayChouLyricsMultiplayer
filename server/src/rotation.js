@@ -56,10 +56,51 @@ function _williamsPlayerMatrix(N) {
   return m;
 }
 
+/**
+ * Check whether the first N-1 rows of a player matrix admit a valid lyric matrix.
+ * Used by _oddPlayerMatrix to skip player-matrix candidates that would leave
+ * buildLyricMatrix unsatisfiable.
+ */
+function _lyricCompatible(singRows, N) {
+  const matrix = Array.from({ length: N - 1 }, () => new Array(N).fill(-1));
+
+  function isValid(phase, song, lyric) {
+    for (let s = 0; s < song; s++) {
+      if (matrix[phase][s] === lyric) return false;
+    }
+    for (let p = 0; p < phase; p++) {
+      if (matrix[p][song] === lyric) return false;
+    }
+    const pIdx = singRows[phase][song];
+    for (let p = 0; p < phase; p++) {
+      const prevS = singRows[p].indexOf(pIdx);
+      if (prevS !== -1 && matrix[p][prevS] === lyric) return false;
+    }
+    return true;
+  }
+
+  function solve(phase, song) {
+    if (phase >= N - 1) return true;
+    const nextSong = song + 1;
+    for (let lyric = 0; lyric < N; lyric++) {
+      if (isValid(phase, song, lyric)) {
+        matrix[phase][song] = lyric;
+        const r = nextSong >= N ? solve(phase + 1, 0) : solve(phase, nextSong);
+        if (r) return true;
+        matrix[phase][song] = -1;
+      }
+    }
+    return false;
+  }
+
+  return solve(0, 0);
+}
+
 function _oddPlayerMatrix(N) {
   // Search for an N×N Latin square (row + col permutation) over 0..N-1
-  // minimising duplicate predecessors per listener. Strategy: try increasing
-  // caps on per-(listener, predecessor) count.
+  // minimising duplicate predecessors per listener, subject to the constraint
+  // that the first N-1 rows admit a valid lyric matrix (lyric-compatible).
+  // Strategy: try increasing caps on per-(listener, predecessor) count.
 
   const m = Array.from({ length: N }, () => new Array(N).fill(-1));
   const rowUsed = Array.from({ length: N }, () => new Set());
@@ -79,7 +120,12 @@ function _oddPlayerMatrix(N) {
     function tryCell(p, s) {
       nodes++;
       if (nodes > nodeBudget) return 'LIMIT';
-      if (p === N) return true;
+      if (p === N) {
+        // Verify lyric compatibility before accepting this player matrix.
+        const singRows = m.slice(0, N - 1).map(row => row.slice());
+        if (_lyricCompatible(singRows, N)) return true;
+        return false;
+      }
       const nextP = s + 1 === N ? p + 1 : p;
       const nextS = s + 1 === N ? 0 : s + 1;
 
@@ -120,7 +166,7 @@ function _oddPlayerMatrix(N) {
   // N=3 cannot achieve maxDup=1; start at 2 (impossible strictness still attempted first for safety)
   const caps = [1, 2, N];
   for (const cap of caps) {
-    const r = trySolve(cap, 500000);
+    const r = trySolve(cap, 2000000);
     if (r === true) return m.map(row => row.slice());
   }
   throw new Error(`No valid player matrix for N=${N}`);
@@ -135,27 +181,25 @@ function _oddPlayerMatrix(N) {
  * guessPhase[i] = { playerIdx, songIdx }
  */
 export function buildAssignments(N) {
-  // Player assignment: song s, phase p → player (s + p) % N
-  // Lyric assignment: use formula for odd N, backtracking for even N
-  const lyricMatrix = buildLyricMatrix(N);
+  const playerMatrix = buildPlayerMatrix(N); // N rows × N cols
+  const lyricMatrix = buildLyricMatrix(N, playerMatrix); // N-1 rows × N cols
 
   const singPhases = [];
   for (let p = 0; p < N - 1; p++) {
     const phase = [];
     for (let s = 0; s < N; s++) {
       phase.push({
-        playerIdx: (s + p) % N,
+        playerIdx: playerMatrix[p][s],
         lyricIdx: lyricMatrix[p][s],
       });
     }
     singPhases.push(phase);
   }
 
-  // Guess phase: player (s + N-1) % N guesses song s
   const guessPhase = [];
   for (let s = 0; s < N; s++) {
     guessPhase.push({
-      playerIdx: (s + N - 1) % N,
+      playerIdx: playerMatrix[N - 1][s],
       songIdx: s,
     });
   }
@@ -169,40 +213,26 @@ export function buildAssignments(N) {
  *
  * Constraints:
  * 1. Each column (fixed phase) is a permutation of 0..N-1
- * 2. Each row (fixed song) has all distinct values
+ * 2. Each row (fixed song) has all distinct values across phases
  * 3. Each player sees distinct lyrics across their phases
  */
-function buildLyricMatrix(N) {
-  // For odd N: (s * 2 + p) % N satisfies all constraints
-  if (N % 2 === 1) {
-    const matrix = [];
-    for (let p = 0; p < N - 1; p++) {
-      const row = [];
-      for (let s = 0; s < N; s++) {
-        row.push((s * 2 + p) % N);
-      }
-      matrix.push(row);
-    }
-    return matrix;
-  }
-
-  // For even N: use backtracking search
+function buildLyricMatrix(N, playerMatrix) {
   const matrix = Array.from({ length: N - 1 }, () => new Array(N).fill(-1));
 
   function isValid(phase, song, lyric) {
-    // No duplicate in this phase (column)
+    // No duplicate in this phase (column of matrix at this phase)
     for (let s = 0; s < song; s++) {
       if (matrix[phase][s] === lyric) return false;
     }
-    // No duplicate in this song (row) across phases
+    // No duplicate in this song (row-for-song across phases)
     for (let p = 0; p < phase; p++) {
       if (matrix[p][song] === lyric) return false;
     }
-    // Player who does this song in this phase hasn't seen this lyric
-    const playerIdx = (song + phase) % N;
+    // Player who sings this (phase, song) must not have seen this lyric before.
+    const playerIdx = playerMatrix[phase][song];
     for (let p = 0; p < phase; p++) {
-      const prevSong = ((playerIdx - p) % N + N) % N;
-      if (matrix[p][prevSong] === lyric) return false;
+      const prevSong = playerMatrix[p].indexOf(playerIdx);
+      if (prevSong !== -1 && matrix[p][prevSong] === lyric) return false;
     }
     return true;
   }
@@ -213,18 +243,14 @@ function buildLyricMatrix(N) {
     for (let lyric = 0; lyric < N; lyric++) {
       if (isValid(phase, song, lyric)) {
         matrix[phase][song] = lyric;
-        if (nextSong >= N) {
-          if (solve(phase + 1, 0)) return true;
-        } else {
-          if (solve(phase, nextSong)) return true;
-        }
+        const recurse = nextSong >= N ? solve(phase + 1, 0) : solve(phase, nextSong);
+        if (recurse) return true;
         matrix[phase][song] = -1;
       }
     }
     return false;
   }
 
-  const success = solve(0, 0);
-  if (!success) throw new Error(`No valid lyric matrix found for N=${N}`);
+  if (!solve(0, 0)) throw new Error(`No valid lyric matrix found for N=${N}`);
   return matrix;
 }
