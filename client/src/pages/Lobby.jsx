@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useRef } from 'react';
 import socket from '../socket.js';
 import { useSocketEvent } from '../hooks/useSocket.js';
+import TelephoneModeSettings from '../components/TelephoneModeSettings.jsx';
 
 export default function Lobby({ nickname, lobby, goToMenu }) {
   const [errorMsg, setErrorMsg] = useState('');
@@ -123,6 +124,19 @@ export default function Lobby({ nickname, lobby, goToMenu }) {
                 <p style={{ margin: '0 0 12px', fontWeight: 600 }}>{lobby.settings.phaseDuration} 秒</p>
               )}
             </>
+          )}
+
+          {isTelephone && (
+            <TelephoneModeSettings
+              disabled={!isHost}
+              config={{
+                audioLockOnRecord: lobby.settings.audioLockOnRecord ?? true,
+                singalongEnabled: lobby.settings.singalongEnabled ?? false,
+                distractionEnabled: lobby.settings.distractionEnabled ?? false,
+                telephoneModeLabel: lobby.settings.telephoneModeLabel ?? 'custom',
+              }}
+              onChange={next => socket.emit('update-settings', { ...lobby.settings, ...next })}
+            />
           )}
 
           <p style={{ margin: 0, color: '#888', fontSize: 14 }}>
