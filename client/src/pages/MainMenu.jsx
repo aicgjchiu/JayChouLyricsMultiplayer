@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import socket from '../socket.js';
 import { useSocketEvent } from '../hooks/useSocket.js';
 import { getPlayerId } from '../playerId.js';
+import TelephoneModeSettings from '../components/TelephoneModeSettings.jsx';
+import { DEFAULT_TELEPHONE_CONFIG } from '../../../shared/telephonePresets.js';
 
 export default function MainMenu({ nickname, setNickname }) {
   const [view, setView] = useState('home'); // 'home' | 'create'
@@ -9,6 +11,7 @@ export default function MainMenu({ nickname, setNickname }) {
   const [form, setForm] = useState({
     lobbyName: '', numQuestions: 10, timeLimit: 30, isPrivate: false, password: '',
     gameMode: 'lyrics-guess', phaseDuration: 90,
+    ...DEFAULT_TELEPHONE_CONFIG,
   });
   const [joiningPrivate, setJoiningPrivate] = useState(null); // lobby object | null
   const [privatePassword, setPrivatePassword] = useState('');
@@ -44,6 +47,10 @@ export default function MainMenu({ nickname, setNickname }) {
       password: form.isPrivate ? form.password : null,
       gameMode: form.gameMode,
       phaseDuration: form.phaseDuration,
+      telephoneModeLabel: form.telephoneModeLabel,
+      audioLockOnRecord: form.audioLockOnRecord,
+      singalongEnabled: form.singalongEnabled,
+      distractionEnabled: form.distractionEnabled,
     });
   }
 
@@ -218,6 +225,18 @@ export default function MainMenu({ nickname, setNickname }) {
                 {[60, 90, 120].map(s => <option key={s} value={s}>{s} 秒</option>)}
               </select>
             </>
+          )}
+
+          {form.gameMode === 'telephone' && (
+            <TelephoneModeSettings
+              config={{
+                audioLockOnRecord: form.audioLockOnRecord,
+                singalongEnabled: form.singalongEnabled,
+                distractionEnabled: form.distractionEnabled,
+                telephoneModeLabel: form.telephoneModeLabel,
+              }}
+              onChange={next => setForm(f => ({ ...f, ...next }))}
+            />
           )}
 
           <label>
