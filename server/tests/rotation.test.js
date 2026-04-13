@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildAssignments } from '../src/rotation.js';
+import { buildAssignments, buildPlayerMatrix } from '../src/rotation.js';
 
 describe('buildAssignments', () => {
   // Test all supported player counts (3-8)
@@ -71,6 +71,24 @@ describe('buildAssignments', () => {
         const guessSongs = result.guessPhase.map(g => g.songIdx);
         expect(new Set(guessSongs).size).toBe(N);
       });
+    });
+  }
+});
+
+describe('buildPlayerMatrix shape', () => {
+  for (const N of [3, 4, 5, 6, 7, 8]) {
+    it(`N=${N}: returns N rows x N cols, each row and col a permutation of 0..N-1`, () => {
+      const m = buildPlayerMatrix(N);
+      expect(m.length).toBe(N);
+      for (let p = 0; p < N; p++) {
+        expect(m[p].length).toBe(N);
+        expect(new Set(m[p]).size).toBe(N);
+      }
+      for (let s = 0; s < N; s++) {
+        const colSet = new Set();
+        for (let p = 0; p < N; p++) colSet.add(m[p][s]);
+        expect(colSet.size).toBe(N);
+      }
     });
   }
 });

@@ -1,4 +1,22 @@
 /**
+ * Build the player-assignment matrix.
+ * matrix[phase][songIdx] = playerIdx, for phase in 0..N-1.
+ * Row N-1 is the guess phase.
+ *
+ * Legacy cyclic formula (will be specialised by N parity in subsequent tasks):
+ *   cell[p][s] = (s + p) % N
+ */
+export function buildPlayerMatrix(N) {
+  const m = [];
+  for (let p = 0; p < N; p++) {
+    const row = [];
+    for (let s = 0; s < N; s++) row.push((s + p) % N);
+    m.push(row);
+  }
+  return m;
+}
+
+/**
  * Build the assignment matrix for telephone mode.
  * @param {number} N - number of players (= number of songs = number of lyrics)
  * @returns {{ singPhases: Array<Array<{playerIdx, lyricIdx}>>, guessPhase: Array<{playerIdx, songIdx}> }}
