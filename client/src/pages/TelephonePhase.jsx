@@ -69,7 +69,15 @@ export default function TelephonePhase({ phase, timer, lobby, nickname, paused }
   async function handleStartRecording() {
     if (audioLock) setAudioDisabled(true);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // When the player will hear concurrent audio (singalong / distraction),
+      // disable browser audio processing — echoCancellation + autoGainControl
+      // treat the playback as echo and aggressively gate the mic, producing
+      // muffled/noisy recordings even with headphones.
+      const concurrentAudio = singalong || distraction;
+      const audioConstraints = concurrentAudio
+        ? { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+        : true;
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
       streamRef.current = stream;
       chunksRef.current = [];
       const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
