@@ -106,6 +106,9 @@ fly deploy
 - **Game-over recap:** Shows all songs with full free-play controls (YouTube, all recordings, answers) on a single scrollable page.
 - **Mic test in lobby:** Telephone mode only. Players can record/playback to verify mic before game starts.
 - **Minimum 3 players** for telephone mode (2 for lyrics-guess).
+- **Difficulty presets:** `settings.telephoneModeLabel` is one of `novice`/`hard`/`hell`/`custom`, backed by three flags: `audioLockOnRecord`, `singalongEnabled`, `distractionEnabled`. Preset definitions live in `shared/telephonePresets.js`. Editing any flag auto-switches the label to `custom`. `singalongEnabled` is only honored when `audioLockOnRecord` is true.
+- **伴唱模式 button:** When active, players can trigger synchronized playback of the source audio during recording.
+- **Distraction audio:** When active, `client/src/distraction.js` plays random clips from `audio/` at random intervals during recording.
 
 ## Songs Included
 
