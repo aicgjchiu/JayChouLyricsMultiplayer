@@ -41,12 +41,14 @@ app.get('*', (_req, res) => {
 });
 
 io.on('connection', (socket) => {
+  const handshakePlayerId = () => socket.handshake.auth && socket.handshake.auth.playerId || null;
+
   socket.on('get-lobbies', () => {
     socket.emit('lobby-list', manager.getLobbies());
   });
 
   socket.on('create-lobby', (data) => {
-    const lobby = manager.createLobby(socket.id, data);
+    const lobby = manager.createLobby(socket.id, { ...data, playerId: data.playerId || handshakePlayerId() });
     socket.join(lobby.id);
     socket.emit('joined-lobby', { code: lobby.id });
     io.to(lobby.id).emit('lobby-updated', manager.lobbyPayload(lobby));
@@ -54,7 +56,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('join-lobby', (data) => {
-    const result = manager.joinLobby(socket.id, data);
+    const result = manager.joinLobby(socket.id, { ...data, playerId: data.playerId || handshakePlayerId() });
     if (result.error) { socket.emit('error', { message: result.error }); return; }
     socket.join(result.lobby.id);
     socket.emit('joined-lobby', { code: result.lobby.id });
