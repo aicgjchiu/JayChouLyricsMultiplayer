@@ -303,6 +303,8 @@ function _startResults(lobby, io) {
   io.to(lobby.id).emit('telephone-results-start', { results, reviewStep: 0 });
 }
 
+export { _endPhase, _startResults };
+
 // Resolves the audio source a listener at phase (targetPhase + 1) should hear
 // for songIdx. Walks back through earlier phases' recordings; if none exist,
 // falls back to the original YouTube. Builds a human-readable fallbackNotice

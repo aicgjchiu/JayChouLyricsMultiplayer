@@ -263,6 +263,45 @@ export class GameManager {
     telephoneMode.resume(lobby, io);
   }
 
+  telephoneContinue(socketId, io) {
+    const lobby = this.getLobby(socketId);
+    if (!lobby || lobby.hostSocketId !== socketId) return;
+    if (!lobby.telephone || !lobby.telephone.paused) return;
+
+    // Promote disconnected players to abandoned.
+    lobby.players.forEach(p => { if (p.disconnected) p.abandoned = true; });
+
+    // Add synthetic markers so the Set covers every slot for completion comparison.
+    const tel = lobby.telephone;
+    lobby.players.forEach((p, idx) => {
+      if (p.abandoned) tel.submissions.add(`abandoned:${idx}`);
+    });
+
+    io.to(lobby.id).emit('telephone-abandoned-players', {
+      nicknames: lobby.players.filter(p => p.abandoned).map(p => p.nickname),
+    });
+    io.to(lobby.id).emit('lobby-updated', this.lobbyPayload(lobby));
+
+    // If the Set already covers every slot, advance immediately.
+    if (tel.submissions.size >= lobby.players.length) {
+      lobby.telephone.paused = false;
+      lobby.telephone.pausedReason = null;
+      if (lobby.state === 'telephone_phase') telephoneMode._endPhase(lobby, io);
+      else if (lobby.state === 'telephone_guess') telephoneMode._startResults(lobby, io);
+      return;
+    }
+
+    // Otherwise re-arm the timer.
+    telephoneMode.resume(lobby, io);
+  }
+
+  telephoneWait(socketId, io) {
+    const lobby = this.getLobby(socketId);
+    if (!lobby || lobby.hostSocketId !== socketId) return;
+    if (!lobby.telephone || !lobby.telephone.paused) return;
+    io.to(lobby.id).emit('telephone-wait-ack');
+  }
+
   wantRematch(socketId, io) {
     const lobby = this.getLobby(socketId);
     if (!lobby || lobby.state !== 'finished') return;

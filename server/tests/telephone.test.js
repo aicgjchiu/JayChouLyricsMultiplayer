@@ -438,3 +438,94 @@ describe('Telephone pause/resume', () => {
     if (lobby.timerHandle) clearInterval(lobby.timerHandle);
   });
 });
+
+describe('Telephone host continue/wait', () => {
+  it('telephoneContinue marks disconnected players abandoned and resumes timer', () => {
+    const mgr = new GameManager();
+    const lobby = createTelephoneLobby(mgr, 3);
+    const io = makeMockIo();
+    mgr.startGame('host', io);
+    mgr.handleDisconnect('p2', io);
+    expect(lobby.telephone.paused).toBe(true);
+
+    mgr.telephoneContinue('host', io);
+
+    const p2 = lobby.players.find(p => p.nickname === 'Player2');
+    expect(p2.abandoned).toBe(true);
+    expect(lobby.telephone.paused).toBe(false);
+    if (lobby.timerHandle) clearInterval(lobby.timerHandle);
+  });
+
+  it('telephoneContinue auto-advances phase when active players already submitted', () => {
+    const mgr = new GameManager();
+    const lobby = createTelephoneLobby(mgr, 3);
+    const io = makeMockIo();
+    mgr.startGame('host', io);
+    // host and p3 submit; p2 then disconnects
+    mgr.submitRecording('host', Buffer.from('a'), io);
+    mgr.submitRecording('p3', Buffer.from('a'), io);
+    mgr.handleDisconnect('p2', io);
+    expect(lobby.telephone.currentPhase).toBe(0);
+
+    mgr.telephoneContinue('host', io);
+
+    expect(lobby.telephone.currentPhase).toBe(1);
+    if (lobby.timerHandle) clearInterval(lobby.timerHandle);
+  });
+
+  it('non-host cannot call telephoneContinue', () => {
+    const mgr = new GameManager();
+    const lobby = createTelephoneLobby(mgr, 3);
+    const io = makeMockIo();
+    mgr.startGame('host', io);
+    mgr.handleDisconnect('p2', io);
+
+    mgr.telephoneContinue('p3', io);
+
+    const p2 = lobby.players.find(p => p.nickname === 'Player2');
+    expect(p2.abandoned).toBe(false);
+    expect(lobby.telephone.paused).toBe(true);
+  });
+
+  it('telephoneWait emits ack without changing state', () => {
+    const mgr = new GameManager();
+    const lobby = createTelephoneLobby(mgr, 3);
+    const io = makeMockIo();
+    mgr.startGame('host', io);
+    mgr.handleDisconnect('p2', io);
+
+    mgr.telephoneWait('host', io);
+
+    expect(lobby.telephone.paused).toBe(true);
+    const p2 = lobby.players.find(p => p.nickname === 'Player2');
+    expect(p2.abandoned).toBe(false);
+    if (lobby.timerHandle) clearInterval(lobby.timerHandle);
+  });
+
+  it('continue during telephone_guess transitions to results if active players already guessed', () => {
+    const mgr = new GameManager();
+    const lobby = createTelephoneLobby(mgr, 3);
+    const io = makeMockIo();
+    mgr.startGame('host', io);
+    if (lobby.timerHandle) { clearInterval(lobby.timerHandle); lobby.timerHandle = null; }
+
+    // Advance through all sing phases (N-1 = 2 phases)
+    for (let phase = 0; phase < 2; phase++) {
+      lobby.players.forEach(p => mgr.submitRecording(p.socketId, Buffer.from('a'), io));
+      if (lobby.timerHandle) { clearInterval(lobby.timerHandle); lobby.timerHandle = null; }
+    }
+    expect(lobby.state).toBe('telephone_guess');
+
+    // Host + p3 guess, p2 disconnects
+    mgr.submitGuess('host', 'X', io);
+    mgr.submitGuess('p3', 'Y', io);
+    mgr.handleDisconnect('p2', io);
+    expect(lobby.state).toBe('telephone_guess');
+    expect(lobby.telephone.paused).toBe(true);
+
+    mgr.telephoneContinue('host', io);
+    expect(lobby.state).toBe('telephone_results');
+
+    if (lobby.timerHandle) clearInterval(lobby.timerHandle);
+  });
+});
