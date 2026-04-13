@@ -127,7 +127,7 @@ describe('GameManager.getLobbies', () => {
     expect(priv.isPrivate).toBe(true);
   });
 
-  it('excludes lobbies that are in_question or finished', () => {
+  it('includes in-progress lobbies but excludes finished', () => {
     const mgr = new GameManager();
     mgr.createLobby('h1', { nickname: 'H1', lobbyName: 'Waiting', numQuestions: 5, timeLimit: 30, isPrivate: false, password: null });
     const inProg = mgr.createLobby('h2', { nickname: 'H2', lobbyName: 'InProgress', numQuestions: 5, timeLimit: 30, isPrivate: false, password: null });
@@ -135,8 +135,14 @@ describe('GameManager.getLobbies', () => {
     const finished = mgr.createLobby('h3', { nickname: 'H3', lobbyName: 'Finished', numQuestions: 5, timeLimit: 30, isPrivate: false, password: null });
     finished.state = 'finished';
     const list = mgr.getLobbies();
-    expect(list).toHaveLength(1);
-    expect(list[0].name).toBe('Waiting');
+    expect(list).toHaveLength(2);
+    const waiting = list.find(l => l.name === 'Waiting');
+    const inProgress = list.find(l => l.name === 'InProgress');
+    expect(waiting).toBeDefined();
+    expect(waiting.inProgress).toBe(false);
+    expect(inProgress).toBeDefined();
+    expect(inProgress.inProgress).toBe(true);
+    expect(list.find(l => l.name === 'Finished')).toBeUndefined();
   });
 });
 
@@ -380,6 +386,54 @@ describe('playerId persistence', () => {
     mgr.joinLobby('sock2', { lobbyCode: lobby.id, nickname: 'B', password: null, playerId: 'pid-B' });
     expect(lobby.players[1].playerId).toBe('pid-B');
     expect(lobby.players[1].disconnected).toBe(false);
+  });
+});
+
+describe('lobby list and payload disconnect flags', () => {
+  it('getLobbies returns in-progress lobbies flagged with inProgress and disconnectedNicknames', () => {
+    const mgr = new GameManager();
+    const lobby = mgr.createLobby('h', { nickname: 'H', gameMode: 'telephone', playerId: 'pid-h' });
+    lobby.state = 'telephone_phase';
+    lobby.players.push({ socketId: 'p2', nickname: 'P2', score: 0, playerId: 'pid-2', disconnected: true, abandoned: false });
+    const list = mgr.getLobbies();
+    const entry = list.find(l => l.code === lobby.id);
+    expect(entry).toBeDefined();
+    expect(entry.inProgress).toBe(true);
+    expect(entry.disconnectedNicknames).toEqual(['P2']);
+  });
+
+  it('getLobbies still lists waiting lobbies with inProgress false', () => {
+    const mgr = new GameManager();
+    const lobby = mgr.createLobby('h', { nickname: 'H', gameMode: 'lyrics-guess', playerId: 'pid-h' });
+    const entry = mgr.getLobbies().find(l => l.code === lobby.id);
+    expect(entry.inProgress).toBe(false);
+    expect(entry.disconnectedNicknames).toEqual([]);
+  });
+
+  it('getLobbies omits finished lobbies', () => {
+    const mgr = new GameManager();
+    const lobby = mgr.createLobby('h', { nickname: 'H', gameMode: 'lyrics-guess', playerId: 'pid-h' });
+    lobby.state = 'finished';
+    expect(mgr.getLobbies().find(l => l.code === lobby.id)).toBeUndefined();
+  });
+
+  it('getLobbies playerCount excludes abandoned players', () => {
+    const mgr = new GameManager();
+    const lobby = mgr.createLobby('h', { nickname: 'H', gameMode: 'telephone', playerId: 'pid-h' });
+    lobby.state = 'telephone_phase';
+    lobby.players.push({ socketId: 'p2', nickname: 'P2', score: 0, playerId: 'pid-2', disconnected: false, abandoned: true });
+    lobby.players.push({ socketId: 'p3', nickname: 'P3', score: 0, playerId: 'pid-3', disconnected: false, abandoned: false });
+    const entry = mgr.getLobbies().find(l => l.code === lobby.id);
+    expect(entry.playerCount).toBe(2); // host + P3, P2 abandoned
+  });
+
+  it('lobbyPayload reflects disconnected/abandoned flags', () => {
+    const mgr = new GameManager();
+    const lobby = mgr.createLobby('h', { nickname: 'H', gameMode: 'telephone', playerId: 'pid-h' });
+    lobby.players[0].disconnected = true;
+    const payload = mgr.lobbyPayload(lobby);
+    expect(payload.players[0].disconnected).toBe(true);
+    expect(payload.players[0].abandoned).toBe(false);
   });
 });
 

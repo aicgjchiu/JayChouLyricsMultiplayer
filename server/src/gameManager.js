@@ -22,13 +22,15 @@ export class GameManager {
 
   getLobbies() {
     return [...this.lobbies.values()]
-      .filter(l => l.state === 'waiting')
+      .filter(l => l.state !== 'finished')
       .map(l => ({
         code: l.id,
         name: l.name,
-        playerCount: l.players.length,
+        playerCount: l.players.filter(p => !p.abandoned).length,
         maxPlayers: l.maxPlayers,
         isPrivate: l.isPrivate,
+        inProgress: l.state !== 'waiting',
+        disconnectedNicknames: l.players.filter(p => p.disconnected && !p.abandoned).map(p => p.nickname),
       }));
   }
 
@@ -43,6 +45,8 @@ export class GameManager {
         nickname: p.nickname,
         score: p.score,
         isHost: p.socketId === lobby.hostSocketId,
+        disconnected: !!p.disconnected,
+        abandoned: !!p.abandoned,
       })),
     };
   }
