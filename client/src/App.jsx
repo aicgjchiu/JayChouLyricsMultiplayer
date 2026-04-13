@@ -22,6 +22,7 @@ export default function App() {
   const [phonePhase, setPhonePhase] = useState(null);
   const [phoneGuess, setPhoneGuess] = useState(null);
   const [phoneResults, setPhoneResults] = useState(null);
+  const [phonePaused, setPhonePaused] = useState(null); // { disconnectedNicknames } | null
   // Rematch state
   const [rematchPlayers, setRematchPlayers] = useState([]);
   const [hostWantsRematch, setHostWantsRematch] = useState(false);
@@ -69,6 +70,10 @@ export default function App() {
     setTimer(data.phaseDuration);
     setPage('telephone-guess');
   }, []));
+
+  useSocketEvent('telephone-paused', useCallback((data) => setPhonePaused(data), []));
+  useSocketEvent('telephone-resumed', useCallback(() => setPhonePaused(null), []));
+  useSocketEvent('telephone-abandoned-players', useCallback(() => setPhonePaused(null), []));
 
   useSocketEvent('telephone-results-start', useCallback((data) => {
     setPhoneResults({ ...data, currentSongIndex: 0, reviewStep: data.reviewStep || 0 });
@@ -129,6 +134,7 @@ export default function App() {
     setPhonePhase(null);
     setPhoneGuess(null);
     setPhoneResults(null);
+    setPhonePaused(null);
     setRematchPlayers([]);
     setHostWantsRematch(false);
     setVotedRematch(false);
@@ -145,6 +151,7 @@ export default function App() {
     setPhonePhase(null);
     setPhoneGuess(null);
     setPhoneResults(null);
+    setPhonePaused(null);
     setRematchPlayers([]);
     setHostWantsRematch(false);
     setVotedRematch(false);
@@ -160,6 +167,7 @@ export default function App() {
     setPhonePhase(null);
     setPhoneGuess(null);
     setPhoneResults(null);
+    setPhonePaused(null);
     setRematchPlayers([]);
     setHostWantsRematch(false);
     setVotedRematch(false);
@@ -203,8 +211,8 @@ export default function App() {
       {page === 'game' && <Game {...sharedProps} />}
       {page === 'reveal' && <Reveal {...sharedProps} />}
       {page === 'results' && <Results {...sharedProps} />}
-      {page === 'telephone-phase' && <TelephonePhase phase={phonePhase} timer={timer} lobby={lobby} nickname={nickname} />}
-      {page === 'telephone-guess' && <TelephoneGuess guess={phoneGuess} timer={timer} lobby={lobby} nickname={nickname} />}
+      {page === 'telephone-phase' && <TelephonePhase phase={phonePhase} timer={timer} lobby={lobby} nickname={nickname} paused={phonePaused} />}
+      {page === 'telephone-guess' && <TelephoneGuess guess={phoneGuess} timer={timer} lobby={lobby} nickname={nickname} paused={phonePaused} />}
       {page === 'telephone-results' && (
         <TelephoneResults
           results={phoneResults} lobby={lobby} finalData={finalData}

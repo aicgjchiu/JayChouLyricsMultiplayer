@@ -3,7 +3,7 @@ import socket from '../socket.js';
 import { useSocketEvent } from '../hooks/useSocket.js';
 import YouTubePlayer from '../components/YouTubePlayer.jsx';
 
-export default function TelephonePhase({ phase, timer, lobby, nickname }) {
+export default function TelephonePhase({ phase, timer, lobby, nickname, paused }) {
   const [uiState, setUiState] = useState('listen'); // 'listen' | 'recording' | 'preview' | 'submitted'
   const [audioDisabled, setAudioDisabled] = useState(false);
   const [recordedBlob, setRecordedBlob] = useState(null);
@@ -34,10 +34,11 @@ export default function TelephonePhase({ phase, timer, lobby, nickname }) {
 
   // Auto-submit on timer expiry
   useEffect(() => {
+    if (paused) return;
     if (timer <= 0 && uiState !== 'submitted') {
       handleAutoSubmit();
     }
-  }, [timer]);
+  }, [timer, paused]);
 
   function handleAutoSubmit() {
     if (uiState === 'recording' && mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
@@ -134,6 +135,28 @@ export default function TelephonePhase({ phase, timer, lobby, nickname }) {
       {phase.fallbackNotice && (
         <div style={{ background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 16px', marginBottom: 16 }}>
           <p style={{ margin: 0, fontSize: 13, color: '#991b1b' }}>⚠️ {phase.fallbackNotice}</p>
+        </div>
+      )}
+
+      {paused && (
+        <div style={{ background: '#fff7ed', border: '2px solid #f97316', borderRadius: 10, padding: 16, marginBottom: 16, textAlign: 'center' }}>
+          <p style={{ margin: '0 0 8px', fontWeight: 700, color: '#9a3412' }}>
+            ⏸ 已暫停 — 以下玩家斷線：{paused.disconnectedNicknames.join('、')}
+          </p>
+          {lobby?.hostSocketId === socket.id ? (
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+              <button onClick={() => socket.emit('telephone-continue')}
+                style={{ padding: '8px 20px', fontSize: 15, background: '#ef4444', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
+                不等了，繼續遊戲
+              </button>
+              <button onClick={() => socket.emit('telephone-wait')}
+                style={{ padding: '8px 20px', fontSize: 15, background: '#3b82f6', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
+                等待重連
+              </button>
+            </div>
+          ) : (
+            <p style={{ color: '#888', fontSize: 14, margin: 0 }}>等待房主決定...</p>
+          )}
         </div>
       )}
 
