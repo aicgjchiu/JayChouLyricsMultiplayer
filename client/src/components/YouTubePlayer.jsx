@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react';
 
 let apiLoaded = false;
 let apiReady = false;
@@ -23,7 +23,7 @@ function onApiReady(cb) {
   loadYouTubeApi();
 }
 
-export default function YouTubePlayer({ youtubeId, startTime, endTime, disabled, onEnded, autoPlay }) {
+function YouTubePlayerInner({ youtubeId, startTime, endTime, disabled, onEnded, autoPlay }, ref) {
   // Outer div is what React owns. YT.Player replaces an inner target div that
   // we create imperatively; that keeps React's ref-tracked node intact so
   // unmount/remount across phase transitions stays clean.
@@ -116,11 +116,18 @@ export default function YouTubePlayer({ youtubeId, startTime, endTime, disabled,
   }, [disabled]);
 
   function handlePlay() {
-    if (playerRef.current) {
-      playerRef.current.seekTo(startTime);
-      playerRef.current.playVideo();
+    // loadVideoById reliably starts at startSeconds even after stopVideo(),
+    // unlike seekTo() which may not honor the seek until playback actually begins.
+    if (playerRef.current && playerRef.current.loadVideoById) {
+      playerRef.current.loadVideoById({
+        videoId: youtubeId,
+        startSeconds: Math.floor(startTime),
+        endSeconds: Math.ceil(endTime),
+      });
     }
   }
+
+  useImperativeHandle(ref, () => ({ play: handlePlay }), [youtubeId, startTime, endTime]);
 
   // Keep the container mounted regardless of `disabled` so the main useEffect
   // (which bails out if containerRef.current is null) can always create the
@@ -151,3 +158,6 @@ export default function YouTubePlayer({ youtubeId, startTime, endTime, disabled,
     </div>
   );
 }
+
+const YouTubePlayer = forwardRef(YouTubePlayerInner);
+export default YouTubePlayer;

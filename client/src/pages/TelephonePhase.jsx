@@ -22,6 +22,7 @@ export default function TelephonePhase({ phase, timer, lobby, nickname, paused }
   const singalong = lobby?.settings?.singalongEnabled ?? false;
   const distraction = lobby?.settings?.distractionEnabled ?? false;
   const distractionRef = useRef(null);
+  const youtubePlayerRef = useRef(null);
 
   // Reset state when phase changes
   useEffect(() => {
@@ -181,6 +182,7 @@ export default function TelephonePhase({ phase, timer, lobby, nickname, paused }
 
         {phase.audioType === 'youtube' ? (
           <YouTubePlayer
+            ref={youtubePlayerRef}
             key={`yt-${phase.phaseIndex}-${phase.audioUrl.youtubeId}`}
             youtubeId={phase.audioUrl.youtubeId}
             startTime={phase.audioUrl.startTime}
@@ -205,6 +207,11 @@ export default function TelephonePhase({ phase, timer, lobby, nickname, paused }
 
       {uiState === 'listen' && (
         <div style={{ textAlign: 'center' }}>
+          {(singalong || distraction) && (
+            <div style={{ background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 6, padding: '8px 12px', marginBottom: 8, fontSize: 13, color: '#92400e' }}>
+              🎧 建議戴耳機：錄音時若喇叭播放音樂，麥克風會收到回音導致錄音雜亂
+            </div>
+          )}
           {audioLock && (
             <p style={{ color: '#dc2626', fontSize: 13, marginBottom: 8 }}>⚠️ 開始錄音後，將無法再聽到音樂</p>
           )}
@@ -223,7 +230,7 @@ export default function TelephonePhase({ phase, timer, lobby, nickname, paused }
             <button
               onClick={() => {
                 if (phase.audioType === 'youtube') {
-                  setAudioDisabled(false);
+                  youtubePlayerRef.current?.play();
                 } else if (recordingAudioRef.current) {
                   recordingAudioRef.current.currentTime = 0;
                   recordingAudioRef.current.play().catch(() => {});
