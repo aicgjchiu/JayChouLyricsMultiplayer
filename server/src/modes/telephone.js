@@ -11,6 +11,42 @@ const allLyrics = JSON.parse(
   readFileSync(join(__dirname, '../../../lyrics.json'), 'utf-8')
 );
 
+export function activePlayers(lobby) {
+  return lobby.players.filter(p => !p.abandoned && !p.disconnected);
+}
+
+export function pause(lobby, disconnectedNicknames, io) {
+  if (!lobby.telephone) return;
+  if (lobby.timerHandle) { clearInterval(lobby.timerHandle); lobby.timerHandle = null; }
+  lobby.telephone.paused = true;
+  lobby.telephone.pausedReason = { disconnected: disconnectedNicknames };
+  io.to(lobby.id).emit('telephone-paused', {
+    disconnectedNicknames,
+    secondsRemaining: lobby.secondsRemaining,
+  });
+}
+
+export function resume(lobby, io) {
+  if (!lobby.telephone || !lobby.telephone.paused) return;
+  lobby.telephone.paused = false;
+  lobby.telephone.pausedReason = null;
+  _armTimer(lobby, io);
+  io.to(lobby.id).emit('telephone-resumed', { secondsRemaining: lobby.secondsRemaining });
+}
+
+function _armTimer(lobby, io) {
+  lobby.timerHandle = setInterval(() => {
+    lobby.secondsRemaining--;
+    io.to(lobby.id).emit('telephone-timer-tick', { secondsRemaining: lobby.secondsRemaining });
+    if (lobby.secondsRemaining <= 0) {
+      clearInterval(lobby.timerHandle);
+      lobby.timerHandle = null;
+      if (lobby.state === 'telephone_phase') _endPhase(lobby, io);
+      else if (lobby.state === 'telephone_guess') _startResults(lobby, io);
+    }
+  }, 1000);
+}
+
 export function startGame(lobby, io) {
   const N = lobby.players.length;
 
@@ -119,6 +155,10 @@ function _startPhase(lobby, io) {
   for (let songIdx = 0; songIdx < phase.length; songIdx++) {
     const assignment = phase[songIdx];
     const player = lobby.players[assignment.playerIdx];
+    if (player.abandoned) {
+      tel.submissions.add(`abandoned:${assignment.playerIdx}`);
+      continue;
+    }
     const song = tel.songs[songIdx];
     const lyric = tel.lyrics[assignment.lyricIdx];
 
@@ -178,6 +218,10 @@ function _startGuess(lobby, io) {
 
   for (const guess of tel.assignments.guessPhase) {
     const player = lobby.players[guess.playerIdx];
+    if (player.abandoned) {
+      tel.submissions.add(`abandoned:${guess.playerIdx}`);
+      continue;
+    }
     const songIdx = guess.songIdx;
     const song = tel.songs[songIdx];
 

@@ -339,3 +339,55 @@ describe('Telephone mode: nextSong', () => {
     expect(lobby.telephone.currentResultSong).toBe(0);
   });
 });
+
+describe('Telephone pause/resume', () => {
+  it('pauseTelephone stops the timer and sets paused flag', () => {
+    const mgr = new GameManager();
+    const lobby = createTelephoneLobby(mgr, 3);
+    const io = makeMockIo();
+    mgr.startGame('host', io);
+    expect(lobby.telephone.paused).toBeFalsy();
+    expect(lobby.timerHandle).toBeTruthy();
+
+    mgr.pauseTelephone(lobby, ['Player2'], io);
+    expect(lobby.telephone.paused).toBe(true);
+    expect(lobby.timerHandle).toBeNull();
+  });
+
+  it('resumeTelephone re-arms timer and clears paused flag', () => {
+    const mgr = new GameManager();
+    const lobby = createTelephoneLobby(mgr, 3);
+    const io = makeMockIo();
+    mgr.startGame('host', io);
+    mgr.pauseTelephone(lobby, ['Player2'], io);
+
+    mgr.resumeTelephone(lobby, io);
+    expect(lobby.telephone.paused).toBe(false);
+    expect(lobby.timerHandle).toBeTruthy();
+    if (lobby.timerHandle) clearInterval(lobby.timerHandle);
+  });
+
+  it('abandoned players are auto-added to submissions at phase start', () => {
+    const mgr = new GameManager();
+    const lobby = createTelephoneLobby(mgr, 3);
+    const io = makeMockIo();
+
+    // Mark p2 as abandoned BEFORE startGame so _startPhase pre-adds the marker.
+    const p2 = lobby.players.find(p => p.nickname === 'Player2');
+    const p2Idx = lobby.players.indexOf(p2);
+    p2.abandoned = true;
+
+    mgr.startGame('host', io);
+    if (lobby.timerHandle) { clearInterval(lobby.timerHandle); lobby.timerHandle = null; }
+
+    // _startPhase should have pre-added the abandoned:idx marker for p2.
+    expect(lobby.telephone.submissions.has(`abandoned:${p2Idx}`)).toBe(true);
+
+    // With the marker pre-added, host+p3 submitting (2 real + 1 abandoned = 3 total) advances the phase.
+    mgr.submitRecording('host', Buffer.from('a'), io);
+    mgr.submitRecording('p3', Buffer.from('a'), io);
+
+    expect(lobby.telephone.currentPhase).toBeGreaterThanOrEqual(1);
+    if (lobby.timerHandle) clearInterval(lobby.timerHandle);
+  });
+});

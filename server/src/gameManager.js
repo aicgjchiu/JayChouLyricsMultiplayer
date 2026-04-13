@@ -246,6 +246,14 @@ export class GameManager {
     telephoneMode.advanceReview(lobby, socketId, io);
   }
 
+  pauseTelephone(lobby, disconnectedNicknames, io) {
+    telephoneMode.pause(lobby, disconnectedNicknames, io);
+  }
+
+  resumeTelephone(lobby, io) {
+    telephoneMode.resume(lobby, io);
+  }
+
   wantRematch(socketId, io) {
     const lobby = this.getLobby(socketId);
     if (!lobby || lobby.state !== 'finished') return;
