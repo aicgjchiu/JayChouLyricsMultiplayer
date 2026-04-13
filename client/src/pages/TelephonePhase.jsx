@@ -253,7 +253,7 @@ export default function TelephonePhase({ phase, timer, lobby, nickname, paused }
       {uiState === 'recording' && (
         <div style={{ textAlign: 'center' }}>
           <p style={{ color: '#ef4444', fontSize: 16, fontWeight: 600, marginBottom: 8 }}>🔴 錄音中...</p>
-          {singalong && audioLock && (
+          {singalong && (
             <button
               onClick={() => {
                 if (phase.audioType === 'youtube') {

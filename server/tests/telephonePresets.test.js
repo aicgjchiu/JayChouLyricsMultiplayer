@@ -9,13 +9,13 @@ import {
 describe('telephonePresets', () => {
   it('returns exact flag bundles for each named preset', () => {
     expect(getPresetConfig('novice')).toEqual({
-      audioLockOnRecord: true, singalongEnabled: true, distractionEnabled: false,
+      audioLockOnRecord: false, singalongEnabled: true, distractionEnabled: false,
     });
     expect(getPresetConfig('hard')).toEqual({
-      audioLockOnRecord: false, singalongEnabled: false, distractionEnabled: false,
+      audioLockOnRecord: true, singalongEnabled: false, distractionEnabled: false,
     });
     expect(getPresetConfig('hell')).toEqual({
-      audioLockOnRecord: false, singalongEnabled: false, distractionEnabled: true,
+      audioLockOnRecord: true, singalongEnabled: false, distractionEnabled: true,
     });
   });
 
@@ -25,21 +25,22 @@ describe('telephonePresets', () => {
   });
 
   it('derives the matching preset label from a flag bundle', () => {
-    expect(derivePresetLabel({ audioLockOnRecord: true, singalongEnabled: true, distractionEnabled: false })).toBe('novice');
-    expect(derivePresetLabel({ audioLockOnRecord: false, singalongEnabled: false, distractionEnabled: true })).toBe('hell');
+    expect(derivePresetLabel({ audioLockOnRecord: false, singalongEnabled: true, distractionEnabled: false })).toBe('novice');
+    expect(derivePresetLabel({ audioLockOnRecord: true, singalongEnabled: false, distractionEnabled: true })).toBe('hell');
   });
 
   it('returns "custom" when no preset matches', () => {
-    expect(derivePresetLabel({ audioLockOnRecord: true, singalongEnabled: false, distractionEnabled: true })).toBe('custom');
+    expect(derivePresetLabel({ audioLockOnRecord: true, singalongEnabled: true, distractionEnabled: true })).toBe('custom');
   });
 
-  it('normalizeTelephoneConfig coerces singalong=false when audioLock=false', () => {
+  it('normalizeTelephoneConfig preserves singalong independent of audioLock', () => {
     const out = normalizeTelephoneConfig({ audioLockOnRecord: false, singalongEnabled: true, distractionEnabled: false });
-    expect(out.singalongEnabled).toBe(false);
+    expect(out.singalongEnabled).toBe(true);
+    expect(out.telephoneModeLabel).toBe('novice');
   });
 
-  it('normalizeTelephoneConfig stamps the correct label', () => {
-    const out = normalizeTelephoneConfig({ audioLockOnRecord: true, singalongEnabled: true, distractionEnabled: false });
-    expect(out.telephoneModeLabel).toBe('novice');
+  it('normalizeTelephoneConfig stamps the correct label for hard preset', () => {
+    const out = normalizeTelephoneConfig({ audioLockOnRecord: true, singalongEnabled: false, distractionEnabled: false });
+    expect(out.telephoneModeLabel).toBe('hard');
   });
 });

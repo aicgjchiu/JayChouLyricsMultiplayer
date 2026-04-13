@@ -1,7 +1,7 @@
 export const TELEPHONE_PRESETS = {
-  novice: { audioLockOnRecord: true,  singalongEnabled: true,  distractionEnabled: false },
-  hard:   { audioLockOnRecord: false, singalongEnabled: false, distractionEnabled: false },
-  hell:   { audioLockOnRecord: false, singalongEnabled: false, distractionEnabled: true  },
+  novice: { audioLockOnRecord: false, singalongEnabled: true,  distractionEnabled: false },
+  hard:   { audioLockOnRecord: true,  singalongEnabled: false, distractionEnabled: false },
+  hell:   { audioLockOnRecord: true,  singalongEnabled: false, distractionEnabled: true  },
 };
 
 export function getPresetConfig(name) {
@@ -20,10 +20,11 @@ export function derivePresetLabel({ audioLockOnRecord, singalongEnabled, distrac
 }
 
 export function normalizeTelephoneConfig(raw) {
-  const audioLockOnRecord = !!raw.audioLockOnRecord;
-  const singalongEnabled = audioLockOnRecord ? !!raw.singalongEnabled : false;
-  const distractionEnabled = !!raw.distractionEnabled;
-  const cfg = { audioLockOnRecord, singalongEnabled, distractionEnabled };
+  const cfg = {
+    audioLockOnRecord: !!raw.audioLockOnRecord,
+    singalongEnabled: !!raw.singalongEnabled,
+    distractionEnabled: !!raw.distractionEnabled,
+  };
   return { ...cfg, telephoneModeLabel: derivePresetLabel(cfg) };
 }
 

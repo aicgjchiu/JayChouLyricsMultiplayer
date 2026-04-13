@@ -20,7 +20,6 @@ export default function TelephoneModeSettings({ config, onChange, disabled = fal
       audioLockOnRecord, singalongEnabled, distractionEnabled,
       [key]: value,
     };
-    if (!next.audioLockOnRecord) next.singalongEnabled = false;
     onChange({ ...next, telephoneModeLabel: derivePresetLabel(next) });
   }
 
@@ -46,14 +45,12 @@ export default function TelephoneModeSettings({ config, onChange, disabled = fal
           {' '}開始錄音後停止播放音樂
         </label>
 
-        {audioLockOnRecord && (
-          <label style={{ marginLeft: 16 }}>
-            <input type="checkbox" disabled={disabled}
-              checked={singalongEnabled}
-              onChange={e => toggleFlag('singalongEnabled', e.target.checked)} />
-            {' '}伴唱模式（錄音時提供按鈕同步播放音樂）
-          </label>
-        )}
+        <label>
+          <input type="checkbox" disabled={disabled}
+            checked={singalongEnabled}
+            onChange={e => toggleFlag('singalongEnabled', e.target.checked)} />
+          {' '}伴唱模式（錄音時提供按鈕同步播放音樂）
+        </label>
 
         <label>
           <input type="checkbox" disabled={disabled}
