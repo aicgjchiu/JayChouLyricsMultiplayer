@@ -2,6 +2,7 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import socket from '../socket.js';
 import { useSocketEvent } from '../hooks/useSocket.js';
 import YouTubePlayer from '../components/YouTubePlayer.jsx';
+import { DistractionScheduler } from '../distraction.js';
 
 export default function TelephonePhase({ phase, timer, lobby, nickname, paused }) {
   const [uiState, setUiState] = useState('listen'); // 'listen' | 'recording' | 'preview' | 'submitted'
@@ -17,6 +18,11 @@ export default function TelephonePhase({ phase, timer, lobby, nickname, paused }
   const autoSubmitOnStopRef = useRef(false);
   const submittedRef = useRef(false);
 
+  const audioLock = lobby?.settings?.audioLockOnRecord ?? true;
+  const singalong = lobby?.settings?.singalongEnabled ?? false;
+  const distraction = lobby?.settings?.distractionEnabled ?? false;
+  const distractionRef = useRef(null);
+
   // Reset state when phase changes
   useEffect(() => {
     setUiState('listen');
@@ -27,6 +33,10 @@ export default function TelephonePhase({ phase, timer, lobby, nickname, paused }
     autoSubmitOnStopRef.current = false;
     submittedRef.current = false;
   }, [phase?.phaseIndex]);
+
+  useEffect(() => () => {
+    if (distractionRef.current) { distractionRef.current.stop(); distractionRef.current = null; }
+  }, []);
 
   useSocketEvent('player-submitted', useCallback(({ nickname: n }) => {
     setSubmittedPlayers(prev => [...prev, n]);
@@ -56,7 +66,7 @@ export default function TelephonePhase({ phase, timer, lobby, nickname, paused }
   }
 
   async function handleStartRecording() {
-    setAudioDisabled(true);
+    if (audioLock) setAudioDisabled(true);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
@@ -78,6 +88,10 @@ export default function TelephonePhase({ phase, timer, lobby, nickname, paused }
       mediaRecorderRef.current = recorder;
       recorder.start();
       setUiState('recording');
+      if (distraction) {
+        distractionRef.current = new DistractionScheduler();
+        distractionRef.current.start();
+      }
     } catch (err) {
       alert('無法存取麥克風: ' + err.message);
     }
@@ -90,6 +104,7 @@ export default function TelephonePhase({ phase, timer, lobby, nickname, paused }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(t => t.stop());
     }
+    if (distractionRef.current) { distractionRef.current.stop(); distractionRef.current = null; }
   }
 
   function handleReRecord() {
@@ -107,6 +122,7 @@ export default function TelephonePhase({ phase, timer, lobby, nickname, paused }
     if (submittedRef.current) return;
     submittedRef.current = true;
     setUiState('submitted');
+    if (distractionRef.current) { distractionRef.current.stop(); distractionRef.current = null; }
     if (blob && blob.size > 0) {
       const arrayBuffer = await blob.arrayBuffer();
       socket.emit('submit-recording', { audioData: arrayBuffer });
@@ -189,7 +205,9 @@ export default function TelephonePhase({ phase, timer, lobby, nickname, paused }
 
       {uiState === 'listen' && (
         <div style={{ textAlign: 'center' }}>
-          <p style={{ color: '#dc2626', fontSize: 13, marginBottom: 8 }}>⚠️ 開始錄音後，將無法再聽到音樂</p>
+          {audioLock && (
+            <p style={{ color: '#dc2626', fontSize: 13, marginBottom: 8 }}>⚠️ 開始錄音後，將無法再聽到音樂</p>
+          )}
           <button
             onClick={handleStartRecording}
             style={{ padding: '12px 32px', fontSize: 16, background: '#ef4444', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
@@ -201,6 +219,20 @@ export default function TelephonePhase({ phase, timer, lobby, nickname, paused }
       {uiState === 'recording' && (
         <div style={{ textAlign: 'center' }}>
           <p style={{ color: '#ef4444', fontSize: 16, fontWeight: 600, marginBottom: 8 }}>🔴 錄音中...</p>
+          {singalong && audioLock && (
+            <button
+              onClick={() => {
+                if (phase.audioType === 'youtube') {
+                  setAudioDisabled(false);
+                } else if (recordingAudioRef.current) {
+                  recordingAudioRef.current.currentTime = 0;
+                  recordingAudioRef.current.play().catch(() => {});
+                }
+              }}
+              style={{ padding: '8px 20px', fontSize: 14, background: '#8b5cf6', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', marginRight: 8 }}>
+              🎵 伴唱模式
+            </button>
+          )}
           <button
             onClick={handleStopRecording}
             style={{ padding: '10px 24px', fontSize: 15, background: '#333', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
