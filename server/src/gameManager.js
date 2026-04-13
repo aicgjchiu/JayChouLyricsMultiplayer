@@ -114,6 +114,24 @@ export class GameManager {
       return;
     }
 
+    if (lobby.state.startsWith('telephone_')) {
+      // Preserve slot — playerIdx in telephone.assignments must stay valid.
+      const player = lobby.players.find(p => p.socketId === socketId);
+      if (!player) return;
+      player.disconnected = true;
+      player.socketId = null;
+
+      const disconnectedNicknames = lobby.players
+        .filter(p => p.disconnected && !p.abandoned)
+        .map(p => p.nickname);
+      if (disconnectedNicknames.length > 0) {
+        telephoneMode.pause(lobby, disconnectedNicknames, io);
+      }
+      io.to(lobby.id).emit('lobby-updated', this.lobbyPayload(lobby));
+      return;
+    }
+
+    // Non-telephone states: existing behavior (filter out).
     lobby.players = lobby.players.filter(p => p.socketId !== socketId);
 
     if (lobby.state === 'waiting') {
@@ -137,15 +155,6 @@ export class GameManager {
       io.to(lobby.id).emit('lobby-updated', this.lobbyPayload(lobby));
     } else if (lobby.state === 'finished') {
       io.to(lobby.id).emit('lobby-updated', this.lobbyPayload(lobby));
-    } else if (lobby.state.startsWith('telephone_')) {
-      if (lobby.players.length === 0) {
-        if (lobby.timerHandle) { clearInterval(lobby.timerHandle); lobby.timerHandle = null; }
-        this.lobbies.delete(lobby.id);
-        return;
-      }
-      if (lobby.telephone) {
-        lobby.telephone.submissions.add(socketId);
-      }
     }
   }
 

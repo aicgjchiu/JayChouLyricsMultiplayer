@@ -340,6 +340,53 @@ describe('Telephone mode: nextSong', () => {
   });
 });
 
+describe('Telephone disconnect pause', () => {
+  it('disconnecting mid-telephone pauses the phase and preserves slot', () => {
+    const mgr = new GameManager();
+    const lobby = createTelephoneLobby(mgr, 3);
+    const io = makeMockIo();
+    mgr.startGame('host', io);
+
+    mgr.handleDisconnect('p2', io);
+
+    expect(lobby.telephone.paused).toBe(true);
+    expect(lobby.timerHandle).toBeNull();
+
+    const p2 = lobby.players.find(p => p.nickname === 'Player2');
+    expect(p2).toBeDefined();
+    expect(p2.disconnected).toBe(true);
+    expect(p2.abandoned).toBe(false);
+    expect(p2.socketId).toBeNull();
+    expect(lobby.players.length).toBe(3); // slot preserved
+  });
+
+  it('host disconnecting mid-telephone still closes the lobby', () => {
+    const mgr = new GameManager();
+    const lobby = createTelephoneLobby(mgr, 3);
+    const io = makeMockIo();
+    mgr.startGame('host', io);
+
+    mgr.handleDisconnect('host', io);
+    // _closeLobby deletes the lobby
+    expect(mgr.lobbies.has(lobby.id)).toBe(false);
+  });
+
+  it('second disconnect adds to disconnectedNicknames, stays paused', () => {
+    const mgr = new GameManager();
+    const lobby = createTelephoneLobby(mgr, 4);
+    const io = makeMockIo();
+    mgr.startGame('host', io);
+
+    mgr.handleDisconnect('p2', io);
+    mgr.handleDisconnect('p3', io);
+
+    expect(lobby.telephone.paused).toBe(true);
+    const disconnected = lobby.players.filter(p => p.disconnected).map(p => p.nickname).sort();
+    expect(disconnected).toEqual(['Player2', 'Player3']);
+    if (lobby.timerHandle) clearInterval(lobby.timerHandle);
+  });
+});
+
 describe('Telephone pause/resume', () => {
   it('pauseTelephone stops the timer and sets paused flag', () => {
     const mgr = new GameManager();
