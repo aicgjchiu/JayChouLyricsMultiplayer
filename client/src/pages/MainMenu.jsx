@@ -13,6 +13,8 @@ export default function MainMenu({ nickname, setNickname }) {
   const [joiningPrivate, setJoiningPrivate] = useState(null); // lobby object | null
   const [privatePassword, setPrivatePassword] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [rejoinTarget, setRejoinTarget] = useState(null); // lobby object or null
+  const [rejoinNickname, setRejoinNickname] = useState('');
 
   useEffect(() => {
     const fetchLobbies = () => socket.emit('get-lobbies');
@@ -57,6 +59,24 @@ export default function MainMenu({ nickname, setNickname }) {
     socket.emit('join-lobby', { playerId: getPlayerId(), lobbyCode: lobby.code, nickname: nickname.trim(), password: null });
   }
 
+  function handleRejoinPrompt(l) {
+    setErrorMsg('');
+    setRejoinTarget(l);
+    setRejoinNickname(nickname.trim() || '');
+    setJoiningPrivate(null);
+  }
+
+  function handleRejoinConfirm(e) {
+    e.preventDefault();
+    if (!rejoinTarget) return;
+    if (!rejoinNickname.trim()) { setErrorMsg('請輸入你斷線前的暱稱'); return; }
+    socket.emit('reconnect-lobby', {
+      lobbyCode: rejoinTarget.code,
+      nickname: rejoinNickname.trim(),
+      playerId: getPlayerId(),
+    });
+  }
+
   function handlePrivateJoin(e) {
     e.preventDefault();
     if (!nickname.trim()) { setErrorMsg('請先輸入暱稱'); return; }
@@ -97,16 +117,32 @@ export default function MainMenu({ nickname, setNickname }) {
           </div>
           {lobbyList.length === 0 && <p style={{ color: '#888' }}>目前沒有 Lobby</p>}
           {lobbyList.map(l => (
-            <div key={l.code}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #eee' }}>
-                <span>{l.isPrivate ? '🔒 ' : ''}{l.name}</span>
+            <div key={l.code} style={{ padding: '8px 0', borderBottom: '1px solid #eee' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                <span style={{ flex: 1 }}>
+                  {l.isPrivate ? '🔒 ' : ''}{l.name}
+                  {l.inProgress && <span style={{ marginLeft: 8, fontSize: 12, color: '#f97316' }}>（遊玩中）</span>}
+                </span>
                 <span style={{ color: '#888', fontSize: 14 }}>{l.playerCount}/{l.maxPlayers} 人</span>
-                <button
-                  onClick={() => handleQuickJoin(l)}
-                  disabled={l.playerCount >= l.maxPlayers}
-                  style={{ padding: '4px 12px', opacity: l.playerCount >= l.maxPlayers ? 0.4 : 1, cursor: l.playerCount >= l.maxPlayers ? 'not-allowed' : 'pointer' }}
-                >加入</button>
+                {!l.inProgress && (
+                  <button
+                    onClick={() => handleQuickJoin(l)}
+                    disabled={l.playerCount >= l.maxPlayers}
+                    style={{ padding: '4px 12px', opacity: l.playerCount >= l.maxPlayers ? 0.4 : 1, cursor: l.playerCount >= l.maxPlayers ? 'not-allowed' : 'pointer' }}
+                  >加入</button>
+                )}
+                {l.inProgress && l.disconnectedNicknames && l.disconnectedNicknames.length > 0 && (
+                  <button
+                    onClick={() => handleRejoinPrompt(l)}
+                    style={{ padding: '4px 12px', background: '#f59e0b', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}
+                  >重新加入</button>
+                )}
               </div>
+              {l.inProgress && l.disconnectedNicknames && l.disconnectedNicknames.length > 0 && (
+                <p style={{ margin: '4px 0 0', fontSize: 12, color: '#888' }}>
+                  斷線中：{l.disconnectedNicknames.join('、')}
+                </p>
+              )}
               {joiningPrivate?.code === l.code && (
                 <form onSubmit={handlePrivateJoin} style={{ padding: '8px 0', display: 'flex', gap: 8 }}>
                   <input
@@ -119,6 +155,24 @@ export default function MainMenu({ nickname, setNickname }) {
                   />
                   <button type="submit" style={{ padding: '6px 12px' }}>確認</button>
                   <button type="button" onClick={() => { setJoiningPrivate(null); setErrorMsg(''); }} style={{ padding: '6px 12px' }}>取消</button>
+                </form>
+              )}
+              {rejoinTarget?.code === l.code && (
+                <form onSubmit={handleRejoinConfirm} style={{ background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 6, margin: '6px 0 0', padding: '8px' }}>
+                  <p style={{ margin: '0 0 6px', fontSize: 13 }}>
+                    輸入你斷線前的暱稱（當前斷線：{l.disconnectedNicknames.join('、')}）
+                  </p>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input
+                      value={rejoinNickname}
+                      onChange={e => setRejoinNickname(e.target.value)}
+                      placeholder="例如 Player2"
+                      autoFocus
+                      style={{ flex: 1, padding: '6px 10px', boxSizing: 'border-box' }}
+                    />
+                    <button type="submit" style={{ padding: '6px 12px', background: '#f59e0b', color: 'white', border: 'none', borderRadius: 4 }}>重新加入</button>
+                    <button type="button" onClick={() => { setRejoinTarget(null); setErrorMsg(''); }} style={{ padding: '6px 12px' }}>取消</button>
+                  </div>
                 </form>
               )}
             </div>
