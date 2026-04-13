@@ -1,3 +1,7 @@
 import { io } from 'socket.io-client';
-const socket = io();
+import { getPlayerId } from './playerId.js';
+
+const socket = io({
+  auth: { playerId: getPlayerId() },
+});
 export default socket;

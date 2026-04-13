@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import socket from '../socket.js';
 import { useSocketEvent } from '../hooks/useSocket.js';
+import { getPlayerId } from '../playerId.js';
 
 export default function MainMenu({ nickname, setNickname }) {
   const [view, setView] = useState('home'); // 'home' | 'create'
@@ -32,6 +33,7 @@ export default function MainMenu({ nickname, setNickname }) {
     if (!nickname.trim()) { setErrorMsg('請輸入暱稱'); return; }
     setErrorMsg('');
     socket.emit('create-lobby', {
+      playerId: getPlayerId(),
       nickname: nickname.trim(),
       lobbyName: form.lobbyName || `${nickname.trim()}'s Lobby`,
       numQuestions: form.numQuestions,
@@ -52,7 +54,7 @@ export default function MainMenu({ nickname, setNickname }) {
       return;
     }
     setErrorMsg('');
-    socket.emit('join-lobby', { lobbyCode: lobby.code, nickname: nickname.trim(), password: null });
+    socket.emit('join-lobby', { playerId: getPlayerId(), lobbyCode: lobby.code, nickname: nickname.trim(), password: null });
   }
 
   function handlePrivateJoin(e) {
@@ -61,7 +63,7 @@ export default function MainMenu({ nickname, setNickname }) {
     setErrorMsg('');
     // joiningPrivate is intentionally not cleared here — keeps form open on wrong-password error.
     // On success, App.jsx navigates away and unmounts MainMenu, clearing state implicitly.
-    socket.emit('join-lobby', { lobbyCode: joiningPrivate.code, nickname: nickname.trim(), password: privatePassword || null });
+    socket.emit('join-lobby', { playerId: getPlayerId(), lobbyCode: joiningPrivate.code, nickname: nickname.trim(), password: privatePassword || null });
   }
 
   return (
