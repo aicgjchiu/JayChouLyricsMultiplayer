@@ -295,6 +295,35 @@ export class GameManager {
     telephoneMode.resume(lobby, io);
   }
 
+  reconnectLobby(socketId, { lobbyCode, playerId, nickname }, io) {
+    const code = (lobbyCode || '').toUpperCase();
+    const lobby = this.lobbies.get(code);
+    if (!lobby) return { error: 'Lobby not found' };
+    if (!playerId) return { error: 'Missing playerId' };
+
+    const slot = lobby.players.find(p => p.playerId === playerId && p.disconnected && !p.abandoned);
+    if (!slot) return { error: 'No disconnected slot matches (maybe host chose to continue without you)' };
+    if (nickname && slot.nickname !== nickname) return { error: 'Nickname does not match the disconnected slot' };
+
+    slot.socketId = socketId;
+    slot.disconnected = false;
+    this.socketToLobby.set(socketId, code);
+
+    io.to(lobby.id).emit('lobby-updated', this.lobbyPayload(lobby));
+
+    if (lobby.telephone) {
+      const snap = telephoneMode.snapshotForPlayer(lobby, slot);
+      if (snap) io.to(socketId).emit(snap.event, snap.payload);
+    }
+
+    const stillDisconnected = lobby.players.some(p => p.disconnected && !p.abandoned);
+    if (!stillDisconnected && lobby.telephone && lobby.telephone.paused) {
+      telephoneMode.resume(lobby, io);
+    }
+
+    return { lobby };
+  }
+
   telephoneWait(socketId, io) {
     const lobby = this.getLobby(socketId);
     if (!lobby || lobby.hostSocketId !== socketId) return;

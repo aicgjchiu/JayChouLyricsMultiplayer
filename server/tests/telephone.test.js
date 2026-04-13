@@ -529,3 +529,99 @@ describe('Telephone host continue/wait', () => {
     if (lobby.timerHandle) clearInterval(lobby.timerHandle);
   });
 });
+
+describe('Telephone reconnect', () => {
+  it('reconnectLobby restores a disconnected slot by playerId', () => {
+    const mgr = new GameManager();
+    const lobby = mgr.createLobby('host', { nickname: 'Host', gameMode: 'telephone', phaseDuration: 90, playerId: 'pid-host' });
+    mgr.joinLobby('p2', { lobbyCode: lobby.id, nickname: 'P2', playerId: 'pid-2' });
+    mgr.joinLobby('p3', { lobbyCode: lobby.id, nickname: 'P3', playerId: 'pid-3' });
+    const io = makeMockIo();
+    mgr.startGame('host', io);
+
+    mgr.handleDisconnect('p2', io);
+    expect(lobby.players[1].disconnected).toBe(true);
+
+    const result = mgr.reconnectLobby('p2-new', { lobbyCode: lobby.id, playerId: 'pid-2', nickname: 'P2' }, io);
+
+    expect(result.error).toBeFalsy();
+    expect(lobby.players[1].disconnected).toBe(false);
+    expect(lobby.players[1].socketId).toBe('p2-new');
+    // Since nobody else is disconnected, game should have resumed.
+    expect(lobby.telephone.paused).toBe(false);
+    if (lobby.timerHandle) clearInterval(lobby.timerHandle);
+  });
+
+  it('reconnectLobby rejects unknown playerId', () => {
+    const mgr = new GameManager();
+    const lobby = mgr.createLobby('host', { nickname: 'Host', gameMode: 'telephone', phaseDuration: 90, playerId: 'pid-host' });
+    mgr.joinLobby('p2', { lobbyCode: lobby.id, nickname: 'P2', playerId: 'pid-2' });
+    mgr.joinLobby('p3', { lobbyCode: lobby.id, nickname: 'P3', playerId: 'pid-3' });
+    const io = makeMockIo();
+    mgr.startGame('host', io);
+    mgr.handleDisconnect('p2', io);
+
+    const result = mgr.reconnectLobby('stranger', { lobbyCode: lobby.id, playerId: 'pid-unknown', nickname: 'P2' }, io);
+
+    expect(result.error).toBeTruthy();
+    if (lobby.timerHandle) clearInterval(lobby.timerHandle);
+  });
+
+  it('reconnectLobby rejects when nickname does not match slot', () => {
+    const mgr = new GameManager();
+    const lobby = mgr.createLobby('host', { nickname: 'Host', gameMode: 'telephone', phaseDuration: 90, playerId: 'pid-host' });
+    mgr.joinLobby('p2', { lobbyCode: lobby.id, nickname: 'P2', playerId: 'pid-2' });
+    mgr.joinLobby('p3', { lobbyCode: lobby.id, nickname: 'P3', playerId: 'pid-3' });
+    const io = makeMockIo();
+    mgr.startGame('host', io);
+    mgr.handleDisconnect('p2', io);
+
+    const result = mgr.reconnectLobby('p2-new', { lobbyCode: lobby.id, playerId: 'pid-2', nickname: 'WrongName' }, io);
+
+    expect(result.error).toBeTruthy();
+    expect(lobby.players[1].disconnected).toBe(true);
+    if (lobby.timerHandle) clearInterval(lobby.timerHandle);
+  });
+
+  it('reconnectLobby rejects reconnect for abandoned player', () => {
+    const mgr = new GameManager();
+    const lobby = mgr.createLobby('host', { nickname: 'Host', gameMode: 'telephone', phaseDuration: 90, playerId: 'pid-host' });
+    mgr.joinLobby('p2', { lobbyCode: lobby.id, nickname: 'P2', playerId: 'pid-2' });
+    mgr.joinLobby('p3', { lobbyCode: lobby.id, nickname: 'P3', playerId: 'pid-3' });
+    const io = makeMockIo();
+    mgr.startGame('host', io);
+    mgr.handleDisconnect('p2', io);
+    mgr.telephoneContinue('host', io);
+
+    const result = mgr.reconnectLobby('p2-new', { lobbyCode: lobby.id, playerId: 'pid-2', nickname: 'P2' }, io);
+
+    expect(result.error).toBeTruthy();
+    if (lobby.timerHandle) clearInterval(lobby.timerHandle);
+  });
+
+  it('reconnecting during telephone_phase sends a phase-start snapshot', () => {
+    const mgr = new GameManager();
+    const lobby = mgr.createLobby('host', { nickname: 'Host', gameMode: 'telephone', phaseDuration: 90, playerId: 'pid-host' });
+    mgr.joinLobby('p2', { lobbyCode: lobby.id, nickname: 'P2', playerId: 'pid-2' });
+    mgr.joinLobby('p3', { lobbyCode: lobby.id, nickname: 'P3', playerId: 'pid-3' });
+
+    const emits = {};
+    lobby.players.forEach(p => { emits[p.socketId] = vi.fn(); });
+    emits['p2-new'] = vi.fn();
+    const io = makeMockIo();
+    io.to = vi.fn().mockImplementation((target) => {
+      if (target === lobby.id) return { emit: io._emitFn };
+      return { emit: emits[target] || vi.fn() };
+    });
+
+    mgr.startGame('host', io);
+    mgr.handleDisconnect('p2', io);
+    mgr.reconnectLobby('p2-new', { lobbyCode: lobby.id, playerId: 'pid-2', nickname: 'P2' }, io);
+
+    const snap = emits['p2-new'].mock.calls.find(c => c[0] === 'telephone-phase-start');
+    expect(snap).toBeDefined();
+    expect(snap[1]).toHaveProperty('phaseIndex');
+    expect(snap[1]).toHaveProperty('lyrics');
+    if (lobby.timerHandle) clearInterval(lobby.timerHandle);
+  });
+});

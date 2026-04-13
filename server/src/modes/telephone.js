@@ -303,6 +303,64 @@ function _startResults(lobby, io) {
   io.to(lobby.id).emit('telephone-results-start', { results, reviewStep: 0 });
 }
 
+export function snapshotForPlayer(lobby, player) {
+  const tel = lobby.telephone;
+  if (!tel) return null;
+  const playerIdx = lobby.players.indexOf(player);
+  if (playerIdx === -1) return null;
+
+  if (lobby.state === 'telephone_phase') {
+    const phase = tel.assignments.singPhases[tel.currentPhase];
+    const songIdx = phase.findIndex(a => a.playerIdx === playerIdx);
+    if (songIdx === -1) return null;
+    const song = tel.songs[songIdx];
+    const assignment = phase[songIdx];
+    const lyric = tel.lyrics[assignment.lyricIdx];
+
+    let audioUrl, audioType, fallbackNotice = null;
+    if (tel.currentPhase === 0) {
+      audioType = 'youtube';
+      audioUrl = { youtubeId: song.youtubeId, startTime: song.startTime, endTime: song.endTime };
+    } else {
+      const resolved = _resolveAudioSource(lobby, tel, songIdx, tel.currentPhase - 1, song);
+      audioType = resolved.audioType;
+      audioUrl = resolved.audioUrl;
+      fallbackNotice = resolved.fallbackNotice;
+    }
+
+    return {
+      event: 'telephone-phase-start',
+      payload: {
+        phaseIndex: tel.currentPhase,
+        songLabel: `歌曲 ${songIdx + 1}`,
+        lyrics: lyric.text,
+        audioUrl, audioType, fallbackNotice,
+        phaseDuration: lobby.secondsRemaining,
+        isFirstPhase: tel.currentPhase === 0,
+      },
+    };
+  }
+
+  if (lobby.state === 'telephone_guess') {
+    const guess = tel.assignments.guessPhase.find(g => g.playerIdx === playerIdx);
+    if (!guess) return null;
+    const song = tel.songs[guess.songIdx];
+    const lastPhase = lobby.players.length - 2;
+    const resolved = _resolveAudioSource(lobby, tel, guess.songIdx, lastPhase, song);
+    return {
+      event: 'telephone-guess-start',
+      payload: {
+        audioUrl: resolved.audioUrl,
+        audioType: resolved.audioType,
+        fallbackNotice: resolved.fallbackNotice,
+        phaseDuration: lobby.secondsRemaining,
+      },
+    };
+  }
+
+  return null;
+}
+
 export { _endPhase, _startResults };
 
 // Resolves the audio source a listener at phase (targetPhase + 1) should hear

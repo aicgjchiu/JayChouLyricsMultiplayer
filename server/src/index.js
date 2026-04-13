@@ -83,6 +83,14 @@ io.on('connection', (socket) => {
   socket.on('telephone-continue', () => manager.telephoneContinue(socket.id, io));
   socket.on('telephone-wait', () => manager.telephoneWait(socket.id, io));
 
+  socket.on('reconnect-lobby', (data) => {
+    const result = manager.reconnectLobby(socket.id, { ...data, playerId: data.playerId || handshakePlayerId() }, io);
+    if (result.error) { socket.emit('error', { message: result.error }); return; }
+    socket.join(result.lobby.id);
+    socket.emit('joined-lobby', { code: result.lobby.id });
+    broadcastLobbyList();
+  });
+
   socket.on('restart-lobby', () => {
     manager.restartLobby(socket.id, io);
     broadcastLobbyList();
