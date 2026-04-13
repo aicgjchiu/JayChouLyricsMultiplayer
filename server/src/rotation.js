@@ -3,10 +3,61 @@
  * matrix[phase][songIdx] = playerIdx, for phase in 0..N-1.
  * Row N-1 is the guess phase.
  *
- * Legacy cyclic formula (will be specialised by N parity in subsequent tasks):
- *   cell[p][s] = (s + p) % N
+ * Even N: Williams row-complete Latin square construction.
+ * Odd N: legacy cyclic formula (will be specialised in Task 3).
  */
 export function buildPlayerMatrix(N) {
+  if (N % 2 === 0) return _williamsPlayerMatrix(N);
+  return _oddPlayerMatrix(N);
+}
+
+/**
+ * Find a Williams tau sequence for Z_N (even N).
+ *
+ * Returns an array tau of length N that is a permutation of Z_N where
+ * every consecutive difference (tau[i] - tau[i-1]) mod N is nonzero and
+ * all N-1 differences are distinct (covering Z_N \ {0} exactly once).
+ *
+ * This guarantees that cell[p][s] = (tau[p] + s) % N is a row-complete
+ * Latin square: every ordered pair (A, B) with A ≠ B appears exactly once
+ * as a vertically adjacent pair (cell[p][s], cell[p+1][s]).
+ */
+function _williamsTau(N) {
+  // Backtracking search: build tau starting from 0,
+  // at each step choose an unused delta d ∈ {1..N-1} such that
+  // the next value (last + d) % N has not been used yet.
+  function search(tau, usedDeltas) {
+    if (tau.length === N) return tau;
+    const last = tau[tau.length - 1];
+    for (let d = 1; d < N; d++) {
+      if (usedDeltas.has(d)) continue;
+      const next = (last + d) % N;
+      if (tau.includes(next)) continue;
+      usedDeltas.add(d);
+      tau.push(next);
+      const result = search(tau, usedDeltas);
+      if (result) return result;
+      tau.pop();
+      usedDeltas.delete(d);
+    }
+    return null;
+  }
+  return search([0], new Set());
+}
+
+function _williamsPlayerMatrix(N) {
+  const tau = _williamsTau(N);
+  const m = [];
+  for (let p = 0; p < N; p++) {
+    const row = [];
+    for (let s = 0; s < N; s++) row.push((tau[p] + s) % N);
+    m.push(row);
+  }
+  return m;
+}
+
+function _oddPlayerMatrix(N) {
+  // Legacy for odd N — replaced in Task 3.
   const m = [];
   for (let p = 0; p < N; p++) {
     const row = [];

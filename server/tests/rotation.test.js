@@ -92,3 +92,32 @@ describe('buildPlayerMatrix shape', () => {
     });
   }
 });
+
+function predecessorsPerListener(m, N) {
+  const preds = new Map();
+  for (let L = 0; L < N; L++) preds.set(L, []);
+  for (let p = 1; p < N; p++) {
+    for (let s = 0; s < N; s++) {
+      const listener = m[p][s];
+      const predecessor = m[p - 1][s];
+      preds.get(listener).push(predecessor);
+    }
+  }
+  return preds;
+}
+
+describe('predecessor diversity — even N (Williams construction)', () => {
+  for (const N of [4, 6, 8]) {
+    it(`N=${N}: every listener hears all N-1 other players exactly once`, () => {
+      const m = buildPlayerMatrix(N);
+      const preds = predecessorsPerListener(m, N);
+      for (let L = 0; L < N; L++) {
+        const list = preds.get(L);
+        expect(list.length).toBe(N - 1);
+        const uniq = new Set(list);
+        expect(uniq.size).toBe(N - 1);
+        expect(uniq.has(L)).toBe(false);
+      }
+    });
+  }
+});
