@@ -57,6 +57,8 @@ export default function TelephonePhase({ phase, timer, lobby, nickname, paused }
       autoSubmitOnStopRef.current = true;
       mediaRecorderRef.current.stop();
       if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
+      if (distractionRef.current) { distractionRef.current.stop(); distractionRef.current = null; }
+      stopSingalongPlayback();
       return;
     }
     if (recordedBlob) {
@@ -106,6 +108,14 @@ export default function TelephonePhase({ phase, timer, lobby, nickname, paused }
     }
   }
 
+  function stopSingalongPlayback() {
+    if (phase?.audioType === 'youtube') {
+      try { youtubePlayerRef.current?.stop?.(); } catch (_) {}
+    } else if (recordingAudioRef.current) {
+      try { recordingAudioRef.current.pause(); } catch (_) {}
+    }
+  }
+
   function handleStopRecording() {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       mediaRecorderRef.current.stop();
@@ -114,6 +124,7 @@ export default function TelephonePhase({ phase, timer, lobby, nickname, paused }
       streamRef.current.getTracks().forEach(t => t.stop());
     }
     if (distractionRef.current) { distractionRef.current.stop(); distractionRef.current = null; }
+    stopSingalongPlayback();
   }
 
   function handleReRecord() {

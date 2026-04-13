@@ -127,7 +127,12 @@ function YouTubePlayerInner({ youtubeId, startTime, endTime, disabled, onEnded, 
     }
   }
 
-  useImperativeHandle(ref, () => ({ play: handlePlay }), [youtubeId, startTime, endTime]);
+  function handleStop() {
+    stopEndTimeMonitor();
+    try { playerRef.current?.stopVideo?.(); } catch (_) {}
+  }
+
+  useImperativeHandle(ref, () => ({ play: handlePlay, stop: handleStop }), [youtubeId, startTime, endTime]);
 
   // Keep the container mounted regardless of `disabled` so the main useEffect
   // (which bails out if containerRef.current is null) can always create the
