@@ -24,6 +24,9 @@ function onApiReady(cb) {
 }
 
 export default function YouTubePlayer({ youtubeId, startTime, endTime, disabled, onEnded, autoPlay }) {
+  // Outer div is what React owns. YT.Player replaces an inner target div that
+  // we create imperatively; that keeps React's ref-tracked node intact so
+  // unmount/remount across phase transitions stays clean.
   const containerRef = useRef(null);
   const playerRef = useRef(null);
   const intervalRef = useRef(null);
@@ -53,15 +56,25 @@ export default function YouTubePlayer({ youtubeId, startTime, endTime, disabled,
   }
 
   useEffect(() => {
+    let cancelled = false;
+
     onApiReady(() => {
+      if (cancelled) return;
       if (!containerRef.current) return;
-      playerRef.current = new window.YT.Player(containerRef.current, {
+
+      // Fresh child element for YT to replace. Using a stable parent (containerRef)
+      // means React never loses track of its own DOM subtree.
+      const target = document.createElement('div');
+      containerRef.current.appendChild(target);
+
+      playerRef.current = new window.YT.Player(target, {
         width: 300,
         height: 170,
         videoId: youtubeId,
         playerVars: { start: Math.floor(startTime), end: Math.ceil(endTime), controls: 0, modestbranding: 1 },
         events: {
           onReady: () => {
+            if (cancelled) return;
             setReady(true);
             if (autoPlay && playerRef.current) {
               playerRef.current.playVideo();
@@ -79,12 +92,28 @@ export default function YouTubePlayer({ youtubeId, startTime, endTime, disabled,
     });
 
     return () => {
+      cancelled = true;
       stopEndTimeMonitor();
       if (playerRef.current && playerRef.current.destroy) {
-        playerRef.current.destroy();
+        try { playerRef.current.destroy(); } catch (_) { /* ignore */ }
+      }
+      playerRef.current = null;
+      // Clear any lingering iframe/child inside the container so the next
+      // mount starts with a clean slate.
+      if (containerRef.current) {
+        while (containerRef.current.firstChild) {
+          containerRef.current.removeChild(containerRef.current.firstChild);
+        }
       }
     };
   }, [youtubeId, startTime, endTime]);
+
+  useEffect(() => {
+    if (disabled && playerRef.current) {
+      stopEndTimeMonitor();
+      try { playerRef.current.stopVideo(); } catch (_) { /* ignore */ }
+    }
+  }, [disabled]);
 
   function handlePlay() {
     if (playerRef.current) {
@@ -93,20 +122,13 @@ export default function YouTubePlayer({ youtubeId, startTime, endTime, disabled,
     }
   }
 
-  useEffect(() => {
-    if (disabled && playerRef.current) {
-      stopEndTimeMonitor();
-      playerRef.current.stopVideo();
-    }
-  }, [disabled]);
-
   if (disabled) {
     return <p style={{ color: '#888', fontStyle: 'italic', textAlign: 'center' }}>音樂已停止（錄音中）</p>;
   }
 
   return (
     <div style={{ textAlign: 'center' }}>
-      <div ref={containerRef} />
+      <div ref={containerRef} style={{ minHeight: 170 }} />
       {ready && (
         <>
           <button onClick={handlePlay} style={{ marginTop: 8, padding: '6px 16px', fontSize: 14 }}>
