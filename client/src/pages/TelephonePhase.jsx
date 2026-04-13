@@ -209,18 +209,26 @@ export default function TelephonePhase({ phase, timer, lobby, nickname, paused }
             disabled={audioDisabled}
           />
         ) : (
-          !audioDisabled ? (
-            <>
-              <audio ref={recordingAudioRef} src={phase.audioUrl} preload="auto" style={{ width: '100%', marginBottom: 8 }} controls />
+          <>
+            {/* Always mount the audio element so imperative play() from 伴唱模式
+                works even when audioLock hides the controls. */}
+            <audio
+              ref={recordingAudioRef}
+              src={phase.audioUrl}
+              preload="auto"
+              style={{ width: '100%', marginBottom: 8, display: audioDisabled ? 'none' : 'block' }}
+              controls
+            />
+            {audioDisabled ? (
+              <p style={{ color: '#888', fontStyle: 'italic', margin: 0 }}>音樂已停止（錄音中）</p>
+            ) : (
               <button
                 onClick={() => { if (recordingAudioRef.current) { recordingAudioRef.current.currentTime = 0; recordingAudioRef.current.play().catch(() => {}); } }}
                 style={{ padding: '6px 16px', fontSize: 14 }}>
                 🔁 重播
               </button>
-            </>
-          ) : (
-            <p style={{ color: '#888', fontStyle: 'italic' }}>音樂已停止（錄音中）</p>
-          )
+            )}
+          </>
         )}
       </div>
 
