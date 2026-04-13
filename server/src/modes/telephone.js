@@ -289,12 +289,17 @@ function _startResults(lobby, io) {
 
     const guessData = tel.guesses.get(songIdx);
 
+    const guesserAssignment = tel.assignments.guessPhase.find(g => g.songIdx === songIdx);
+    const guesserPlayer = guesserAssignment ? lobby.players[guesserAssignment.playerIdx] : null;
+    const guesserAbandoned = !!(guesserPlayer && guesserPlayer.abandoned);
+
     return {
       songName: song.name,
       youtube: { youtubeId: song.youtubeId, startTime: song.startTime, endTime: song.endTime },
       chain,
-      guess: guessData ? guessData.guess : '（未作答）',
-      guesserNickname: guessData ? guessData.nickname : '?',
+      guess: guessData ? guessData.guess : (guesserAbandoned ? '（玩家斷線未作答）' : '（未作答）'),
+      guesserNickname: guesserPlayer ? guesserPlayer.nickname : (guessData ? guessData.nickname : '?'),
+      guesserAbandoned,
     };
   });
 

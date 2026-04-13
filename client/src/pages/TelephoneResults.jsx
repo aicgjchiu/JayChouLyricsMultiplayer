@@ -99,7 +99,13 @@ export default function TelephoneResults({ results, lobby, finalData, goToMenu, 
           {step === revealStep && (
             <div style={{ background: '#f0fdf4', border: '2px solid #22c55e', borderRadius: 12, padding: 20, marginBottom: 16 }}>
               <p style={{ margin: '0 0 4px', fontSize: 13, color: '#16a34a' }}>{song.guesserNickname} 猜的答案</p>
-              <p style={{ margin: '0 0 12px', fontSize: 28, fontWeight: 700 }}>{song.guess}</p>
+              <p style={{
+                margin: '0 0 12px',
+                fontSize: 28,
+                fontWeight: 700,
+                color: song.guesserAbandoned ? '#9ca3af' : '#1f2937',
+                fontStyle: song.guesserAbandoned ? 'italic' : 'normal',
+              }}>{song.guess}</p>
               <p style={{ margin: '0 0 4px', fontSize: 13, color: '#888' }}>正確答案</p>
               <p style={{ margin: 0, fontSize: 28, fontWeight: 700, color: song.guess === song.songName ? '#16a34a' : '#dc2626' }}>
                 {song.songName}
@@ -178,7 +184,13 @@ export default function TelephoneResults({ results, lobby, finalData, goToMenu, 
           {/* Guess reveal */}
           <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8, padding: '12px 16px', marginBottom: 16 }}>
             <p style={{ margin: '0 0 4px', fontSize: 13, color: '#16a34a' }}>{song.guesserNickname} 猜的答案</p>
-            <p style={{ margin: '0 0 8px', fontSize: 20, fontWeight: 700 }}>{song.guess}</p>
+            <p style={{
+              margin: '0 0 8px',
+              fontSize: 20,
+              fontWeight: 700,
+              color: song.guesserAbandoned ? '#9ca3af' : '#1f2937',
+              fontStyle: song.guesserAbandoned ? 'italic' : 'normal',
+            }}>{song.guess}</p>
             <p style={{ margin: '0 0 4px', fontSize: 13, color: '#888' }}>正確答案</p>
             <p style={{ margin: 0, fontSize: 20, fontWeight: 700, color: song.guess === song.songName ? '#16a34a' : '#dc2626' }}>
               {song.songName}
@@ -241,7 +253,13 @@ export default function TelephoneResults({ results, lobby, finalData, goToMenu, 
               {/* Guess */}
               <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8, padding: '10px 16px' }}>
                 <p style={{ margin: '0 0 4px', fontSize: 13, color: '#16a34a' }}>{s.guesserNickname} 猜的答案</p>
-                <p style={{ margin: '0 0 4px', fontSize: 18, fontWeight: 700 }}>{s.guess}</p>
+                <p style={{
+                  margin: '0 0 4px',
+                  fontSize: 18,
+                  fontWeight: 700,
+                  color: s.guesserAbandoned ? '#9ca3af' : '#1f2937',
+                  fontStyle: s.guesserAbandoned ? 'italic' : 'normal',
+                }}>{s.guess}</p>
                 <p style={{ margin: 0, fontSize: 14, color: s.guess === s.songName ? '#16a34a' : '#dc2626' }}>
                   正確答案: {s.songName} {s.guess === s.songName ? '✓' : '✗'}
                 </p>

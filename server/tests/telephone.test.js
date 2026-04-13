@@ -625,3 +625,32 @@ describe('Telephone reconnect', () => {
     if (lobby.timerHandle) clearInterval(lobby.timerHandle);
   });
 });
+
+describe('Telephone results with abandoned guesser', () => {
+  it('marks abandoned guessers with guesserAbandoned flag and custom message', () => {
+    const mgr = new GameManager();
+    const lobby = createTelephoneLobby(mgr, 3);
+    const io = makeMockIo();
+    mgr.startGame('host', io);
+    if (lobby.timerHandle) { clearInterval(lobby.timerHandle); lobby.timerHandle = null; }
+
+    const buf = Buffer.from('a');
+    for (let phase = 0; phase < 2; phase++) {
+      lobby.players.forEach(p => mgr.submitRecording(p.socketId, buf, io));
+      if (lobby.timerHandle) { clearInterval(lobby.timerHandle); lobby.timerHandle = null; }
+    }
+    expect(lobby.state).toBe('telephone_guess');
+
+    // Host and p3 guess; p2 disconnects → host continues
+    mgr.submitGuess('host', 'X', io);
+    mgr.submitGuess('p3', 'Y', io);
+    mgr.handleDisconnect('p2', io);
+    mgr.telephoneContinue('host', io);
+
+    expect(lobby.state).toBe('telephone_results');
+    const abandonedResults = lobby.telephone.resultsData.filter(r => r.guesserAbandoned);
+    expect(abandonedResults.length).toBe(1);
+    expect(abandonedResults[0].guess).toBe('（玩家斷線未作答）');
+    if (lobby.timerHandle) clearInterval(lobby.timerHandle);
+  });
+});
