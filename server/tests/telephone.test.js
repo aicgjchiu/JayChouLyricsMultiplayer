@@ -626,6 +626,31 @@ describe('Telephone reconnect', () => {
   });
 });
 
+describe('Telephone restart after abandoned player', () => {
+  it('restartLobby removes abandoned player slots from the lobby', () => {
+    const mgr = new GameManager();
+    const lobby = createTelephoneLobby(mgr, 3);
+    const io = makeMockIo();
+    mgr.startGame('host', io);
+    if (lobby.timerHandle) { clearInterval(lobby.timerHandle); lobby.timerHandle = null; }
+
+    mgr.handleDisconnect('p2', io);
+    mgr.telephoneContinue('host', io);
+    lobby.state = 'finished';
+
+    expect(lobby.players.length).toBe(3);
+    mgr.restartLobby('host', io);
+
+    expect(lobby.players.length).toBe(2);
+    expect(lobby.players.find(p => p.nickname === 'Player2')).toBeUndefined();
+    lobby.players.forEach(p => {
+      expect(p.disconnected).toBe(false);
+      expect(p.abandoned).toBe(false);
+      expect(p.score).toBe(0);
+    });
+  });
+});
+
 describe('Telephone results with abandoned guesser', () => {
   it('marks abandoned guessers with guesserAbandoned flag and custom message', () => {
     const mgr = new GameManager();

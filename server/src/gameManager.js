@@ -186,7 +186,10 @@ export class GameManager {
     lobby.currentQuestionIndex = 0;
     lobby.currentAnswers = new Map();
     lobby.playerDrafts = new Map();
-    lobby.players.forEach(p => { p.score = 0; });
+    // Drop players who left during the prior game (disconnected or abandoned);
+    // reset flags on remaining players.
+    lobby.players = lobby.players.filter(p => !p.disconnected && !p.abandoned);
+    lobby.players.forEach(p => { p.score = 0; p.disconnected = false; p.abandoned = false; });
     lobby.telephone = null;
 
     io.to(lobby.id).emit('lobby-restarted');
