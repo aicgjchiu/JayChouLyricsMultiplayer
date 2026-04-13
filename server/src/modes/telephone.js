@@ -50,7 +50,9 @@ export function submitRecording(lobby, socketId, audioBuffer, io) {
   const songIdx = phase.findIndex(a => a.playerIdx === playerIdx);
   if (songIdx === -1) return;
 
-  tel.recordings.set(`${songIdx}-${tel.currentPhase}`, audioBuffer);
+  if (audioBuffer && audioBuffer.length > 0) {
+    tel.recordings.set(`${songIdx}-${tel.currentPhase}`, audioBuffer);
+  }
   tel.submissions.add(socketId);
 
   io.to(lobby.id).emit('player-submitted', {
@@ -120,18 +122,16 @@ function _startPhase(lobby, io) {
     const song = tel.songs[songIdx];
     const lyric = tel.lyrics[assignment.lyricIdx];
 
-    let audioUrl, audioType;
+    let audioUrl, audioType, fallbackNotice = null;
     if (tel.currentPhase === 0) {
       audioType = 'youtube';
       audioUrl = { youtubeId: song.youtubeId, startTime: song.startTime, endTime: song.endTime };
     } else {
-      audioType = 'recording';
-      const prevKey = `${songIdx}-${tel.currentPhase - 1}`;
-      if (tel.recordings.has(prevKey)) {
-        audioUrl = `/recordings/${lobby.id}/${songIdx}/${tel.currentPhase - 1}`;
-      } else {
-        audioUrl = _findFallbackAudio(tel, songIdx, tel.currentPhase - 1, lobby.id);
-      }
+      const prevPhase = tel.currentPhase - 1;
+      const resolved = _resolveAudioSource(lobby, tel, songIdx, prevPhase, song);
+      audioType = resolved.audioType;
+      audioUrl = resolved.audioUrl;
+      fallbackNotice = resolved.fallbackNotice;
     }
 
     io.to(player.socketId).emit('telephone-phase-start', {
@@ -140,6 +140,7 @@ function _startPhase(lobby, io) {
       lyrics: lyric.text,
       audioUrl,
       audioType,
+      fallbackNotice,
       phaseDuration: lobby.settings.phaseDuration,
       isFirstPhase: tel.currentPhase === 0,
     });
@@ -178,18 +179,15 @@ function _startGuess(lobby, io) {
   for (const guess of tel.assignments.guessPhase) {
     const player = lobby.players[guess.playerIdx];
     const songIdx = guess.songIdx;
+    const song = tel.songs[songIdx];
 
     const lastPhase = lobby.players.length - 2;
-    const lastKey = `${songIdx}-${lastPhase}`;
-    let audioUrl;
-    if (tel.recordings.has(lastKey)) {
-      audioUrl = `/recordings/${lobby.id}/${songIdx}/${lastPhase}`;
-    } else {
-      audioUrl = _findFallbackAudio(tel, songIdx, lastPhase, lobby.id);
-    }
+    const resolved = _resolveAudioSource(lobby, tel, songIdx, lastPhase, song);
 
     io.to(player.socketId).emit('telephone-guess-start', {
-      audioUrl,
+      audioUrl: resolved.audioUrl,
+      audioType: resolved.audioType,
+      fallbackNotice: resolved.fallbackNotice,
       phaseDuration: lobby.settings.phaseDuration,
     });
   }
@@ -261,11 +259,40 @@ function _startResults(lobby, io) {
   io.to(lobby.id).emit('telephone-results-start', { results, reviewStep: 0 });
 }
 
-function _findFallbackAudio(tel, songIdx, targetPhase, lobbyId) {
+// Resolves the audio source a listener at phase (targetPhase + 1) should hear
+// for songIdx. Walks back through earlier phases' recordings; if none exist,
+// falls back to the original YouTube. Builds a human-readable fallbackNotice
+// that names the skipped player(s) and what the listener will actually hear.
+function _resolveAudioSource(lobby, tel, songIdx, targetPhase, song) {
+  const players = lobby.players;
+  const skippedNicks = [];
+
   for (let p = targetPhase; p >= 0; p--) {
+    const assignment = tel.assignments.singPhases[p][songIdx];
+    const singerNick = players[assignment.playerIdx].nickname;
     if (tel.recordings.has(`${songIdx}-${p}`)) {
-      return `/recordings/${lobbyId}/${songIdx}/${p}`;
+      let fallbackNotice = null;
+      if (p !== targetPhase) {
+        const skipLabel = skippedNicks.map((n, i) =>
+          `第 ${targetPhase - i + 1} 回合的 ${n}`
+        ).join('、');
+        fallbackNotice = `${skipLabel} 沒錄音，你聽到的是第 ${p + 1} 回合 ${singerNick} 的錄音`;
+      }
+      return {
+        audioType: 'recording',
+        audioUrl: `/recordings/${lobby.id}/${songIdx}/${p}`,
+        fallbackNotice,
+      };
     }
+    skippedNicks.push(singerNick);
   }
-  return null;
+
+  const skipLabel = skippedNicks.map((n, i) =>
+    `第 ${targetPhase - i + 1} 回合的 ${n}`
+  ).join('、');
+  return {
+    audioType: 'youtube',
+    audioUrl: { youtubeId: song.youtubeId, startTime: song.startTime, endTime: song.endTime },
+    fallbackNotice: `${skipLabel} 都沒錄音，這裡改放原曲 YouTube`,
+  };
 }

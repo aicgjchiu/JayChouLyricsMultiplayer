@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import socket from '../socket.js';
 import { useSocketEvent } from '../hooks/useSocket.js';
+import YouTubePlayer from '../components/YouTubePlayer.jsx';
 
 export default function TelephoneGuess({ guess, timer, lobby, nickname }) {
   const [answer, setAnswer] = useState('');
@@ -47,14 +48,31 @@ export default function TelephoneGuess({ guess, timer, lobby, nickname }) {
         <span style={{ fontSize: 28, fontWeight: 700, color: timerColor }}>⏱ {timer}s</span>
       </div>
 
+      {guess.fallbackNotice && (
+        <div style={{ background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 16px', marginBottom: 12 }}>
+          <p style={{ margin: 0, fontSize: 13, color: '#991b1b' }}>⚠️ {guess.fallbackNotice}</p>
+        </div>
+      )}
+
       <div style={{ background: '#f5f5f5', borderRadius: 10, padding: 16, marginBottom: 16, textAlign: 'center' }}>
-        <p style={{ margin: '0 0 8px', color: '#888', fontSize: 14 }}>聽聽這段錄音，猜猜是哪首歌？</p>
-        <audio ref={audioRef} src={guess.audioUrl} preload="auto" style={{ width: '100%', marginBottom: 8 }} controls />
-        <button
-          onClick={() => { if (audioRef.current) { audioRef.current.currentTime = 0; audioRef.current.play().catch(() => {}); } }}
-          style={{ padding: '6px 16px', fontSize: 14 }}>
-          🔁 重播
-        </button>
+        <p style={{ margin: '0 0 8px', color: '#888', fontSize: 14 }}>聽聽這段{guess.audioType === 'youtube' ? '原曲' : '錄音'}，猜猜是哪首歌？</p>
+        {guess.audioType === 'youtube' ? (
+          <YouTubePlayer
+            youtubeId={guess.audioUrl.youtubeId}
+            startTime={guess.audioUrl.startTime}
+            endTime={guess.audioUrl.endTime}
+            disabled={false}
+          />
+        ) : (
+          <>
+            <audio ref={audioRef} src={guess.audioUrl} preload="auto" style={{ width: '100%', marginBottom: 8 }} controls />
+            <button
+              onClick={() => { if (audioRef.current) { audioRef.current.currentTime = 0; audioRef.current.play().catch(() => {}); } }}
+              style={{ padding: '6px 16px', fontSize: 14 }}>
+              🔁 重播
+            </button>
+          </>
+        )}
       </div>
 
       <form onSubmit={handleSubmit}>

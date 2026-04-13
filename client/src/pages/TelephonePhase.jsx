@@ -14,6 +14,8 @@ export default function TelephonePhase({ phase, timer, lobby, nickname }) {
   const streamRef = useRef(null);
   const audioPreviewRef = useRef(null);
   const recordingAudioRef = useRef(null);
+  const autoSubmitOnStopRef = useRef(false);
+  const submittedRef = useRef(false);
 
   // Reset state when phase changes
   useEffect(() => {
@@ -22,6 +24,8 @@ export default function TelephonePhase({ phase, timer, lobby, nickname }) {
     setRecordedBlob(null);
     setRecordedUrl(null);
     setSubmittedPlayers([]);
+    autoSubmitOnStopRef.current = false;
+    submittedRef.current = false;
   }, [phase?.phaseIndex]);
 
   useSocketEvent('player-submitted', useCallback(({ nickname: n }) => {
@@ -36,6 +40,13 @@ export default function TelephonePhase({ phase, timer, lobby, nickname }) {
   }, [timer]);
 
   function handleAutoSubmit() {
+    if (uiState === 'recording' && mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      // Mid-recording: stop the recorder; onstop will submit the resulting blob.
+      autoSubmitOnStopRef.current = true;
+      mediaRecorderRef.current.stop();
+      if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
+      return;
+    }
     if (recordedBlob) {
       doSubmit(recordedBlob);
     } else {
@@ -56,7 +67,12 @@ export default function TelephonePhase({ phase, timer, lobby, nickname }) {
         const url = URL.createObjectURL(blob);
         setRecordedBlob(blob);
         setRecordedUrl(url);
-        setUiState('preview');
+        if (autoSubmitOnStopRef.current) {
+          autoSubmitOnStopRef.current = false;
+          doSubmit(blob);
+        } else {
+          setUiState('preview');
+        }
       };
       mediaRecorderRef.current = recorder;
       recorder.start();
@@ -87,9 +103,10 @@ export default function TelephonePhase({ phase, timer, lobby, nickname }) {
   }
 
   async function doSubmit(blob) {
-    if (uiState === 'submitted') return;
+    if (submittedRef.current) return;
+    submittedRef.current = true;
     setUiState('submitted');
-    if (blob) {
+    if (blob && blob.size > 0) {
       const arrayBuffer = await blob.arrayBuffer();
       socket.emit('submit-recording', { audioData: arrayBuffer });
     } else {
@@ -113,6 +130,12 @@ export default function TelephonePhase({ phase, timer, lobby, nickname }) {
       <div style={{ background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 8, padding: '10px 16px', marginBottom: 16 }}>
         <p style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>請用提供的歌詞，搭配你聽到的旋律來唱歌</p>
       </div>
+
+      {phase.fallbackNotice && (
+        <div style={{ background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 16px', marginBottom: 16 }}>
+          <p style={{ margin: 0, fontSize: 13, color: '#991b1b' }}>⚠️ {phase.fallbackNotice}</p>
+        </div>
+      )}
 
       <div style={{ background: '#f5f5f5', borderRadius: 10, padding: 16, marginBottom: 16, textAlign: 'center' }}>
         <p style={{ margin: '0 0 8px', fontSize: 18, fontWeight: 600 }}>{phase.lyrics}</p>
