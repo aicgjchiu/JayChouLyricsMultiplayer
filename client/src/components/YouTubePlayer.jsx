@@ -122,22 +122,31 @@ export default function YouTubePlayer({ youtubeId, startTime, endTime, disabled,
     }
   }
 
-  if (disabled) {
-    return <p style={{ color: '#888', fontStyle: 'italic', textAlign: 'center' }}>音樂已停止（錄音中）</p>;
-  }
-
+  // Keep the container mounted regardless of `disabled` so the main useEffect
+  // (which bails out if containerRef.current is null) can always create the
+  // YT.Player. Hide the container when disabled and show a notice instead —
+  // but never unmount it, or a disabled→enabled flip would leave us with no
+  // player and no way to create one (useEffect doesn't re-fire when only
+  // `disabled` changes).
   return (
     <div style={{ textAlign: 'center' }}>
-      <div ref={containerRef} style={{ minHeight: 170 }} />
-      {ready && (
-        <>
-          <button onClick={handlePlay} style={{ marginTop: 8, padding: '6px 16px', fontSize: 14 }}>
-            🔁 重播片段
-          </button>
-          <p style={{ margin: '6px 0 0', fontSize: 12, color: '#888' }}>
-            請使用上方按鈕重播，直接點影片可能無法播放正確片段
-          </p>
-        </>
+      <div
+        ref={containerRef}
+        style={{ minHeight: disabled ? 0 : 170, display: disabled ? 'none' : 'block' }}
+      />
+      {disabled ? (
+        <p style={{ color: '#888', fontStyle: 'italic', margin: 0 }}>音樂已停止（錄音中）</p>
+      ) : (
+        ready && (
+          <>
+            <button onClick={handlePlay} style={{ marginTop: 8, padding: '6px 16px', fontSize: 14 }}>
+              🔁 重播片段
+            </button>
+            <p style={{ margin: '6px 0 0', fontSize: 12, color: '#888' }}>
+              請使用上方按鈕重播，直接點影片可能無法播放正確片段
+            </p>
+          </>
+        )
       )}
     </div>
   );
