@@ -57,14 +57,73 @@ function _williamsPlayerMatrix(N) {
 }
 
 function _oddPlayerMatrix(N) {
-  // Legacy for odd N — replaced in Task 3.
-  const m = [];
-  for (let p = 0; p < N; p++) {
-    const row = [];
-    for (let s = 0; s < N; s++) row.push((s + p) % N);
-    m.push(row);
+  // Search for an N×N Latin square (row + col permutation) over 0..N-1
+  // minimising duplicate predecessors per listener. Strategy: try increasing
+  // caps on per-(listener, predecessor) count.
+
+  const m = Array.from({ length: N }, () => new Array(N).fill(-1));
+  const rowUsed = Array.from({ length: N }, () => new Set());
+  const colUsed = Array.from({ length: N }, () => new Set());
+  const predCount = Array.from({ length: N }, () => new Array(N).fill(0));
+
+  function reset() {
+    for (let p = 0; p < N; p++) { m[p].fill(-1); rowUsed[p].clear(); }
+    for (let s = 0; s < N; s++) colUsed[s].clear();
+    for (let L = 0; L < N; L++) predCount[L].fill(0);
   }
-  return m;
+
+  function trySolve(maxDup, nodeBudget) {
+    reset();
+    let nodes = 0;
+
+    function tryCell(p, s) {
+      nodes++;
+      if (nodes > nodeBudget) return 'LIMIT';
+      if (p === N) return true;
+      const nextP = s + 1 === N ? p + 1 : p;
+      const nextS = s + 1 === N ? 0 : s + 1;
+
+      const cands = [];
+      for (let v = 0; v < N; v++) {
+        if (rowUsed[p].has(v)) continue;
+        if (colUsed[s].has(v)) continue;
+        let dup = 0;
+        if (p > 0) {
+          const A = m[p - 1][s];
+          if (predCount[v][A] + 1 > maxDup) continue;
+          dup = predCount[v][A];
+        }
+        cands.push([dup, v]);
+      }
+      cands.sort((a, b) => a[0] - b[0]);
+
+      for (const [, v] of cands) {
+        m[p][s] = v;
+        rowUsed[p].add(v);
+        colUsed[s].add(v);
+        let A = null;
+        if (p > 0) { A = m[p - 1][s]; predCount[v][A]++; }
+        const r = tryCell(nextP, nextS);
+        if (r === true) return true;
+        if (r === 'LIMIT') return 'LIMIT';
+        m[p][s] = -1;
+        rowUsed[p].delete(v);
+        colUsed[s].delete(v);
+        if (A !== null) predCount[v][A]--;
+      }
+      return false;
+    }
+
+    return tryCell(0, 0);
+  }
+
+  // N=3 cannot achieve maxDup=1; start at 2 (impossible strictness still attempted first for safety)
+  const caps = [1, 2, N];
+  for (const cap of caps) {
+    const r = trySolve(cap, 500000);
+    if (r === true) return m.map(row => row.slice());
+  }
+  throw new Error(`No valid player matrix for N=${N}`);
 }
 
 /**

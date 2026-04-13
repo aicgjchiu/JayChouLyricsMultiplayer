@@ -121,3 +121,30 @@ describe('predecessor diversity — even N (Williams construction)', () => {
     });
   }
 });
+
+describe('predecessor diversity — odd N (best effort)', () => {
+  it('N=3: each listener gets N-1 predecessors, none is self', () => {
+    const m = buildPlayerMatrix(3);
+    const preds = predecessorsPerListener(m, 3);
+    for (let L = 0; L < 3; L++) {
+      expect(preds.get(L).length).toBe(2);
+      for (const a of preds.get(L)) expect(a).not.toBe(L);
+    }
+  });
+
+  for (const N of [5, 7]) {
+    it(`N=${N}: no listener has more than 1 duplicate predecessor (maxRepeat <= 2)`, () => {
+      const m = buildPlayerMatrix(N);
+      const preds = predecessorsPerListener(m, N);
+      for (let L = 0; L < N; L++) {
+        const list = preds.get(L);
+        expect(list.length).toBe(N - 1);
+        const counts = new Map();
+        for (const a of list) counts.set(a, (counts.get(a) || 0) + 1);
+        const maxRepeat = Math.max(...counts.values());
+        expect(maxRepeat).toBeLessThanOrEqual(2);
+        for (const a of list) expect(a).not.toBe(L);
+      }
+    });
+  }
+});
