@@ -88,6 +88,9 @@ io.on('connection', (socket) => {
     if (result.error) { socket.emit('error', { message: result.error }); return; }
     socket.join(result.lobby.id);
     socket.emit('joined-lobby', { code: result.lobby.id });
+    if (result.snapshot) {
+      socket.emit(result.snapshot.event, result.snapshot.payload);
+    }
     broadcastLobbyList();
   });
 

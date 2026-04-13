@@ -59,6 +59,7 @@ export default function TelephoneGuess({ guess, timer, lobby, nickname, paused }
         <p style={{ margin: '0 0 8px', color: '#888', fontSize: 14 }}>聽聽這段{guess.audioType === 'youtube' ? '原曲' : '錄音'}，猜猜是哪首歌？</p>
         {guess.audioType === 'youtube' ? (
           <YouTubePlayer
+            key={`yt-guess-${guess.audioUrl.youtubeId}`}
             youtubeId={guess.audioUrl.youtubeId}
             startTime={guess.audioUrl.startTime}
             endTime={guess.audioUrl.endTime}

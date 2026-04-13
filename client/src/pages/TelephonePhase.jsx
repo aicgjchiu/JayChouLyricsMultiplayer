@@ -165,6 +165,7 @@ export default function TelephonePhase({ phase, timer, lobby, nickname, paused }
 
         {phase.audioType === 'youtube' ? (
           <YouTubePlayer
+            key={`yt-${phase.phaseIndex}-${phase.audioUrl.youtubeId}`}
             youtubeId={phase.audioUrl.youtubeId}
             startTime={phase.audioUrl.startTime}
             endTime={phase.audioUrl.endTime}

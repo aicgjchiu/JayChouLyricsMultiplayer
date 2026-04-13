@@ -311,17 +311,14 @@ export class GameManager {
 
     io.to(lobby.id).emit('lobby-updated', this.lobbyPayload(lobby));
 
-    if (lobby.telephone) {
-      const snap = telephoneMode.snapshotForPlayer(lobby, slot);
-      if (snap) io.to(socketId).emit(snap.event, snap.payload);
-    }
+    const snapshot = lobby.telephone ? telephoneMode.snapshotForPlayer(lobby, slot) : null;
 
     const stillDisconnected = lobby.players.some(p => p.disconnected && !p.abandoned);
     if (!stillDisconnected && lobby.telephone && lobby.telephone.paused) {
       telephoneMode.resume(lobby, io);
     }
 
-    return { lobby };
+    return { lobby, snapshot };
   }
 
   telephoneWait(socketId, io) {

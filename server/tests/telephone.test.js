@@ -616,12 +616,12 @@ describe('Telephone reconnect', () => {
 
     mgr.startGame('host', io);
     mgr.handleDisconnect('p2', io);
-    mgr.reconnectLobby('p2-new', { lobbyCode: lobby.id, playerId: 'pid-2', nickname: 'P2' }, io);
+    const result = mgr.reconnectLobby('p2-new', { lobbyCode: lobby.id, playerId: 'pid-2', nickname: 'P2' }, io);
 
-    const snap = emits['p2-new'].mock.calls.find(c => c[0] === 'telephone-phase-start');
-    expect(snap).toBeDefined();
-    expect(snap[1]).toHaveProperty('phaseIndex');
-    expect(snap[1]).toHaveProperty('lyrics');
+    expect(result.snapshot).toBeDefined();
+    expect(result.snapshot.event).toBe('telephone-phase-start');
+    expect(result.snapshot.payload).toHaveProperty('phaseIndex');
+    expect(result.snapshot.payload).toHaveProperty('lyrics');
     if (lobby.timerHandle) clearInterval(lobby.timerHandle);
   });
 });
