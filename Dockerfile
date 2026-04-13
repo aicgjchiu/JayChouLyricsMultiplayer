@@ -1,5 +1,7 @@
 # Stage 1: Build React client
 FROM node:20-alpine AS builder
+WORKDIR /app
+COPY shared/ ./shared/
 WORKDIR /app/client
 COPY client/package*.json ./
 RUN npm ci
@@ -14,6 +16,9 @@ WORKDIR /app
 COPY server/package*.json ./server/
 RUN cd server && npm ci --omit=dev
 COPY server/ ./server/
+
+# Copy shared modules (imported by server at runtime)
+COPY shared/ ./shared/
 
 # Copy game assets
 COPY questions.json ./
