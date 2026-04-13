@@ -47,7 +47,7 @@ export class GameManager {
     };
   }
 
-  createLobby(socketId, { nickname, lobbyName, numQuestions, timeLimit, isPrivate, password, gameMode, phaseDuration }) {
+  createLobby(socketId, { nickname, lobbyName, numQuestions, timeLimit, isPrivate, password, gameMode, phaseDuration, playerId }) {
     let code;
     do { code = generateCode(); } while (this.lobbies.has(code));
 
@@ -64,7 +64,7 @@ export class GameManager {
         timeLimit: timeLimit || 30,
         phaseDuration: phaseDuration || 90,
       },
-      players: [{ socketId, nickname, score: 0 }],
+      players: [{ socketId, nickname, score: 0, playerId: playerId || null, disconnected: false, abandoned: false }],
       state: 'waiting',
       // Lyrics-guess fields
       questions: [],
@@ -84,7 +84,7 @@ export class GameManager {
     return lobby;
   }
 
-  joinLobby(socketId, { lobbyCode, nickname, password }) {
+  joinLobby(socketId, { lobbyCode, nickname, password, playerId }) {
     const code = (lobbyCode || '').toUpperCase();
     const lobby = this.lobbies.get(code);
 
@@ -94,7 +94,7 @@ export class GameManager {
     if (lobby.players.some(p => p.nickname === nickname)) return { error: 'Nickname already taken' };
     if (lobby.isPrivate && lobby.password !== password) return { error: 'Wrong password' };
 
-    lobby.players.push({ socketId, nickname, score: 0 });
+    lobby.players.push({ socketId, nickname, score: 0, playerId: playerId || null, disconnected: false, abandoned: false });
     this.socketToLobby.set(socketId, code);
     return { lobby };
   }

@@ -365,6 +365,24 @@ describe('GameManager._endQuestion draft fallback', () => {
   });
 });
 
+describe('playerId persistence', () => {
+  it('stores playerId on the host player slot', () => {
+    const mgr = new GameManager();
+    const lobby = mgr.createLobby('sock1', { nickname: 'A', gameMode: 'lyrics-guess', playerId: 'pid-A' });
+    expect(lobby.players[0].playerId).toBe('pid-A');
+    expect(lobby.players[0].disconnected).toBe(false);
+    expect(lobby.players[0].abandoned).toBe(false);
+  });
+
+  it('stores playerId on a joining player slot', () => {
+    const mgr = new GameManager();
+    const lobby = mgr.createLobby('sock1', { nickname: 'A', gameMode: 'lyrics-guess', playerId: 'pid-A' });
+    mgr.joinLobby('sock2', { lobbyCode: lobby.id, nickname: 'B', password: null, playerId: 'pid-B' });
+    expect(lobby.players[1].playerId).toBe('pid-B');
+    expect(lobby.players[1].disconnected).toBe(false);
+  });
+});
+
 describe('GameManager.nextQuestion', () => {
   it('does not set revealTimer after _endQuestion (no auto-advance)', () => {
     const mgr = new GameManager();
