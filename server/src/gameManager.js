@@ -2,6 +2,7 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import * as lyricsGuessMode from './modes/lyricsGuess.js';
 import * as telephoneMode from './modes/telephone.js';
+import { getPresetConfig, normalizeTelephoneConfig, DEFAULT_TELEPHONE_CONFIG } from '../../shared/telephonePresets.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -51,9 +52,21 @@ export class GameManager {
     };
   }
 
-  createLobby(socketId, { nickname, lobbyName, numQuestions, timeLimit, isPrivate, password, gameMode, phaseDuration, playerId }) {
+  createLobby(socketId, {
+    nickname, lobbyName, numQuestions, timeLimit, isPrivate, password, gameMode,
+    phaseDuration, playerId,
+    telephoneModeLabel, audioLockOnRecord, singalongEnabled, distractionEnabled,
+  }) {
     let code;
     do { code = generateCode(); } while (this.lobbies.has(code));
+
+    const preset = telephoneModeLabel ? getPresetConfig(telephoneModeLabel) : null;
+    const rawTel = preset ?? {
+      audioLockOnRecord: audioLockOnRecord ?? DEFAULT_TELEPHONE_CONFIG.audioLockOnRecord,
+      singalongEnabled: singalongEnabled ?? DEFAULT_TELEPHONE_CONFIG.singalongEnabled,
+      distractionEnabled: distractionEnabled ?? DEFAULT_TELEPHONE_CONFIG.distractionEnabled,
+    };
+    const telCfg = normalizeTelephoneConfig(rawTel);
 
     const lobby = {
       id: code,
@@ -67,6 +80,7 @@ export class GameManager {
         numQuestions: numQuestions || 10,
         timeLimit: timeLimit || 30,
         phaseDuration: phaseDuration || 90,
+        ...telCfg,
       },
       players: [{ socketId, nickname, score: 0, playerId: playerId || null, disconnected: false, abandoned: false }],
       state: 'waiting',
@@ -203,6 +217,25 @@ export class GameManager {
     if (data.timeLimit) lobby.settings.timeLimit = data.timeLimit;
     if (data.phaseDuration) lobby.settings.phaseDuration = data.phaseDuration;
     if (data.gameMode) lobby.settings.gameMode = data.gameMode;
+
+    const preset = data.telephoneModeLabel ? getPresetConfig(data.telephoneModeLabel) : null;
+    const touched =
+      preset !== null ||
+      'audioLockOnRecord' in data ||
+      'singalongEnabled' in data ||
+      'distractionEnabled' in data;
+    if (touched) {
+      const merged = preset ?? {
+        audioLockOnRecord: lobby.settings.audioLockOnRecord,
+        singalongEnabled: lobby.settings.singalongEnabled,
+        distractionEnabled: lobby.settings.distractionEnabled,
+        ...('audioLockOnRecord' in data ? { audioLockOnRecord: !!data.audioLockOnRecord } : {}),
+        ...('singalongEnabled' in data ? { singalongEnabled: !!data.singalongEnabled } : {}),
+        ...('distractionEnabled' in data ? { distractionEnabled: !!data.distractionEnabled } : {}),
+      };
+      Object.assign(lobby.settings, normalizeTelephoneConfig(merged));
+    }
+
     io.to(lobby.id).emit('lobby-updated', this.lobbyPayload(lobby));
   }
 
