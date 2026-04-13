@@ -32,6 +32,9 @@ A party game inspired by the telephone game, but with music:
 - Host-controlled step-by-step results review (original → each recording → answer reveal → free-play)
 - Full game-over recap with all songs and recordings
 - No scoring — the fun is in the degradation and the guesses
+- **Predecessor diversity:** rotation is built on a row-complete Latin square (Williams construction for even N, backtracking for odd N) so every listener hears a different previous-singer each round instead of always the same person
+- **Mid-round fallback:** if a player doesn't submit, the chain falls back to the most recent prior recording (or YouTube) with an on-screen notice naming the skipped player
+- **Disconnect handling:** if someone disconnects mid-game the timer pauses, the host picks "wait for reconnect" or "continue without them", and the disconnected player can rejoin from the main menu by entering their old nickname
 
 ## How to Play
 
