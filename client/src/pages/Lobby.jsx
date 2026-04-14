@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import socket from '../socket.js';
 import { useSocketEvent } from '../hooks/useSocket.js';
 import TelephoneModeSettings from '../components/TelephoneModeSettings.jsx';
@@ -47,6 +47,21 @@ export default function Lobby({ nickname, lobby, goToMenu }) {
 
   useSocketEvent('error', useCallback(({ message }) => setErrorMsg(message), []));
 
+  // Cheat code: host types "aiscream" anywhere on the lobby page → force-include song id 15 this round.
+  useEffect(() => {
+    if (!isHost) return;
+    let buf = '';
+    const CHEAT = 'aiscream';
+    function onKey(e) {
+      if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+      if (e.key.length !== 1) return;
+      buf = (buf + e.key.toLowerCase()).slice(-CHEAT.length);
+      if (buf === CHEAT) { socket.emit('activate-cheat', { code: CHEAT }); buf = ''; }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isHost]);
+
   function handleStartGame() {
     socket.emit('start-game');
   }
@@ -67,6 +82,12 @@ export default function Lobby({ nickname, lobby, goToMenu }) {
       <p style={{ margin: '0 0 12px', padding: '6px 12px', background: isTelephone ? '#fef3c7' : '#dbeafe', borderRadius: 6, fontSize: 14 }}>
         {isTelephone ? '🎤 音樂傳聲筒' : '🎵 周杰倫猜歌'}
       </p>
+
+      {isHost && lobby.cheatActive && (
+        <p style={{ margin: '0 0 12px', padding: '6px 12px', background: '#fce7f3', border: '1px dashed #ec4899', borderRadius: 6, fontSize: 13, color: '#9d174d' }}>
+          🎯 金手指已啟動（本回合強制包含指定歌曲，遊戲開始後自動關閉）
+        </p>
+      )}
 
       {errorMsg && <p style={{ color: 'red' }}>{errorMsg}</p>}
 

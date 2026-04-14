@@ -82,6 +82,7 @@ io.on('connection', (socket) => {
   socket.on('want-rematch', () => manager.wantRematch(socket.id, io));
   socket.on('telephone-continue', () => manager.telephoneContinue(socket.id, io));
   socket.on('telephone-wait', () => manager.telephoneWait(socket.id, io));
+  socket.on('activate-cheat', ({ code }) => manager.activateCheat(socket.id, code, io));
 
   socket.on('reconnect-lobby', (data) => {
     const result = manager.reconnectLobby(socket.id, { ...data, playerId: data.playerId || handshakePlayerId() }, io);

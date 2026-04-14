@@ -53,6 +53,15 @@ export function startGame(lobby, io) {
   const shuffledSongs = [...allSongs].sort(() => Math.random() - 0.5);
   const songs = shuffledSongs.slice(0, N);
 
+  // Cheat: force-include a specific song (consumed once per game start).
+  if (lobby.cheat?.forceIncludeSongId) {
+    const forced = allSongs.find(s => s.id === lobby.cheat.forceIncludeSongId);
+    if (forced && !songs.some(s => s.id === forced.id)) {
+      songs[Math.floor(Math.random() * songs.length)] = forced;
+    }
+    lobby.cheat = null;
+  }
+
   const selectedSongNames = new Set(songs.map(s => s.name));
   const eligibleLyrics = allLyrics.filter(l => !selectedSongNames.has(l.songName));
   const shuffledLyrics = [...eligibleLyrics].sort(() => Math.random() - 0.5);

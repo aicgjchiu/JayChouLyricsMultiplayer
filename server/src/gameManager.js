@@ -42,6 +42,7 @@ export class GameManager {
       hostSocketId: lobby.hostSocketId,
       settings: lobby.settings,
       maxPlayers: lobby.maxPlayers,
+      cheatActive: !!lobby.cheat,
       players: lobby.players.map(p => ({
         nickname: p.nickname,
         score: p.score,
@@ -355,6 +356,14 @@ export class GameManager {
     }
 
     return { lobby, snapshot };
+  }
+
+  activateCheat(socketId, code, io) {
+    const lobby = this.getLobby(socketId);
+    if (!lobby || lobby.hostSocketId !== socketId || lobby.state !== 'waiting') return;
+    if (code !== 'aiscream') return;
+    lobby.cheat = { forceIncludeSongId: 15 };
+    io.to(lobby.id).emit('lobby-updated', this.lobbyPayload(lobby));
   }
 
   telephoneWait(socketId, io) {
