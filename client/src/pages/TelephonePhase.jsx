@@ -26,6 +26,15 @@ export default function TelephonePhase({ phase, timer, lobby, nickname, paused }
 
   // Reset state when phase changes
   useEffect(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      autoSubmitOnStopRef.current = false;
+      try { mediaRecorderRef.current.stop(); } catch (_) {}
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+    }
+    if (distractionRef.current) { distractionRef.current.stop(); distractionRef.current = null; }
     setUiState('listen');
     setAudioDisabled(false);
     setRecordedBlob(null);
@@ -42,6 +51,14 @@ export default function TelephonePhase({ phase, timer, lobby, nickname, paused }
   useSocketEvent('player-submitted', useCallback(({ nickname: n }) => {
     setSubmittedPlayers(prev => [...prev, n]);
   }, []));
+
+  useSocketEvent('submit-rejected', useCallback(({ reason }) => {
+    if (reason === 'phase-mismatch' || reason === 'wrong-state') {
+      submittedRef.current = false;
+      setUiState(prev => (recordedBlob ? 'preview' : 'listen'));
+      alert('上一輪已結束，你的提交被退回。請在新回合重新錄音。');
+    }
+  }, [recordedBlob]));
 
   // Auto-submit on timer expiry
   useEffect(() => {
@@ -143,11 +160,12 @@ export default function TelephonePhase({ phase, timer, lobby, nickname, paused }
     submittedRef.current = true;
     setUiState('submitted');
     if (distractionRef.current) { distractionRef.current.stop(); distractionRef.current = null; }
+    const phaseIndex = phase.phaseIndex;
     if (blob && blob.size > 0) {
       const arrayBuffer = await blob.arrayBuffer();
-      socket.emit('submit-recording', { audioData: arrayBuffer });
+      socket.emit('submit-recording', { audioData: arrayBuffer, phaseIndex });
     } else {
-      socket.emit('submit-recording', { audioData: new ArrayBuffer(0) });
+      socket.emit('submit-recording', { audioData: new ArrayBuffer(0), phaseIndex });
     }
   }
 

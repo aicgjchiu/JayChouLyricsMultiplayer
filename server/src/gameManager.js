@@ -268,10 +268,10 @@ export class GameManager {
     lyricsGuessMode.advanceQuestion(lobby, io);
   }
 
-  submitRecording(socketId, audioBuffer, io) {
+  submitRecording(socketId, audioBuffer, io, phaseIndex) {
     const lobby = this.getLobby(socketId);
     if (!lobby) return;
-    telephoneMode.submitRecording(lobby, socketId, audioBuffer, io);
+    telephoneMode.submitRecording(lobby, socketId, audioBuffer, io, phaseIndex);
   }
 
   submitGuess(socketId, guess, io) {

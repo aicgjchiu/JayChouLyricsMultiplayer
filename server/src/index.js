@@ -72,9 +72,9 @@ io.on('connection', (socket) => {
   socket.on('submit-answer', (data) => manager.submitAnswer(socket.id, data, io));
   socket.on('update-draft', ({ answer }) => manager.updateDraft(socket.id, answer));
   socket.on('next-question', () => manager.nextQuestion(socket.id, io));
-  socket.on('submit-recording', ({ audioData }) => {
+  socket.on('submit-recording', ({ audioData, phaseIndex }) => {
     const buffer = Buffer.from(audioData);
-    manager.submitRecording(socket.id, buffer, io);
+    manager.submitRecording(socket.id, buffer, io, phaseIndex);
   });
   socket.on('submit-guess', ({ guess }) => manager.submitGuess(socket.id, guess, io));
   socket.on('next-song', () => manager.nextSong(socket.id, io));

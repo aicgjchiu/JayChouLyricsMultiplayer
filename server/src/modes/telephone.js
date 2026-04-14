@@ -83,11 +83,23 @@ export function startGame(lobby, io) {
   _startPhase(lobby, io);
 }
 
-export function submitRecording(lobby, socketId, audioBuffer, io) {
-  if (lobby.state !== 'telephone_phase') return;
-  if (lobby.telephone.submissions.has(socketId)) return;
-
+export function submitRecording(lobby, socketId, audioBuffer, io, clientPhaseIndex) {
+  if (lobby.state !== 'telephone_phase') {
+    io.to(socketId).emit('submit-rejected', {
+      reason: 'wrong-state',
+      state: lobby.state,
+    });
+    return;
+  }
   const tel = lobby.telephone;
+  if (typeof clientPhaseIndex === 'number' && clientPhaseIndex !== tel.currentPhase) {
+    io.to(socketId).emit('submit-rejected', {
+      reason: 'phase-mismatch',
+      currentPhase: tel.currentPhase,
+    });
+    return;
+  }
+
   const playerIdx = lobby.players.findIndex(p => p.socketId === socketId);
   if (playerIdx === -1) return;
 
@@ -111,7 +123,13 @@ export function submitRecording(lobby, socketId, audioBuffer, io) {
 }
 
 export function submitGuess(lobby, socketId, guess, io) {
-  if (lobby.state !== 'telephone_guess') return;
+  if (lobby.state !== 'telephone_guess') {
+    io.to(socketId).emit('submit-rejected', {
+      reason: 'wrong-state',
+      state: lobby.state,
+    });
+    return;
+  }
   if (lobby.telephone.submissions.has(socketId)) return;
 
   const tel = lobby.telephone;

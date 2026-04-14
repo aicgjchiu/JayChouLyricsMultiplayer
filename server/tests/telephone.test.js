@@ -679,3 +679,77 @@ describe('Telephone results with abandoned guesser', () => {
     if (lobby.timerHandle) clearInterval(lobby.timerHandle);
   });
 });
+
+describe('Telephone mode: submit race with host-forced continue', () => {
+  it('rejects a submit-recording whose phaseIndex is stale after forced advance', () => {
+    const mgr = new GameManager();
+    const lobby = createTelephoneLobby(mgr, 4);
+    const io = makeMockIo();
+    mgr.startGame('host', io);
+    expect(lobby.state).toBe('telephone_phase');
+    expect(lobby.telephone.currentPhase).toBe(0);
+
+    const submitters = lobby.players.slice(0, 3);
+    for (const p of submitters) {
+      mgr.submitRecording(p.socketId, Buffer.from([1, 2, 3]), io, 0);
+    }
+    const laggard = lobby.players[3];
+    mgr.handleDisconnect(laggard.socketId, io);
+    expect(lobby.telephone.paused).toBe(true);
+
+    mgr.telephoneContinue('host', io);
+    expect(lobby.telephone.currentPhase).toBe(1);
+
+    const stalePlayer = submitters[0];
+    const beforeKeys = [...lobby.telephone.recordings.keys()];
+    mgr.submitRecording(stalePlayer.socketId, Buffer.from([9, 9]), io, 0);
+    const afterKeys = [...lobby.telephone.recordings.keys()];
+    expect(afterKeys).toEqual(beforeKeys);
+
+    if (lobby.timerHandle) clearInterval(lobby.timerHandle);
+  });
+
+  it('emits submit-rejected to the stale submitter', () => {
+    const mgr = new GameManager();
+    const lobby = createTelephoneLobby(mgr, 4);
+    const perSocket = {};
+    lobby.players.forEach(p => { perSocket[p.socketId] = vi.fn(); });
+    const io = makeMockIo();
+    io.to = vi.fn().mockImplementation(id => ({ emit: perSocket[id] || io._emitFn }));
+
+    mgr.startGame('host', io);
+    const [a, b, c, d] = lobby.players;
+    mgr.submitRecording(a.socketId, Buffer.from([1]), io, 0);
+    mgr.submitRecording(b.socketId, Buffer.from([1]), io, 0);
+    mgr.submitRecording(c.socketId, Buffer.from([1]), io, 0);
+    mgr.handleDisconnect(d.socketId, io);
+    mgr.telephoneContinue('host', io);
+
+    perSocket[a.socketId].mockClear();
+    mgr.submitRecording(a.socketId, Buffer.from([9]), io, 0);
+    expect(perSocket[a.socketId]).toHaveBeenCalledWith(
+      'submit-rejected',
+      expect.objectContaining({ reason: 'phase-mismatch', currentPhase: 1 })
+    );
+
+    if (lobby.timerHandle) clearInterval(lobby.timerHandle);
+  });
+});
+
+describe('Telephone mode: submit-guess phase validation', () => {
+  it('rejects a guess submitted while still in phase state', () => {
+    const mgr = new GameManager();
+    const lobby = createTelephoneLobby(mgr, 3);
+    const perSocket = {};
+    lobby.players.forEach(p => { perSocket[p.socketId] = vi.fn(); });
+    const io = makeMockIo();
+    io.to = vi.fn().mockImplementation(id => ({ emit: perSocket[id] || io._emitFn }));
+    mgr.startGame('host', io);
+    mgr.submitGuess(lobby.players[0].socketId, 'x', io);
+    expect(perSocket[lobby.players[0].socketId]).toHaveBeenCalledWith(
+      'submit-rejected',
+      expect.objectContaining({ reason: 'wrong-state' })
+    );
+    if (lobby.timerHandle) clearInterval(lobby.timerHandle);
+  });
+});
